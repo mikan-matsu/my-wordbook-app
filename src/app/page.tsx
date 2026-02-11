@@ -1,65 +1,390 @@
-import Image from "next/image";
+// 【クライアントコンポーネント】React Hooksを使用するため"use client"が必須
+"use client";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { generateClient } from "aws-amplify/api";
+import { listWords } from "../graphql/queries";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+
+// 【Amplify GraphQLクライアント】AWS AppSyncと通信するためのクライアント
+const client = generateClient();
+
+// 【カード・アニメーション設定】前後の方向に応じてカードがスライドインして表示される
+const cardVariants: Variants = {
+  enter: (direction: number) => ({
+    // 右方向(next)なら右から左へ、左方向(prev)なら左から右へ進入
+    x: direction > 0 ? "20%" : "-20%",
+    opacity: 0,
+  }),
+  center: { x: 0, opacity: 1 }, // 中央に配置して完全表示
+  exit: (direction: number) => ({
+    // 方向に応じて反対方向に退出
+    x: direction > 0 ? "-20%" : "20%",
+    opacity: 0,
+  }),
+};
 
 export default function Home() {
+  // 【状態管理】
+  const [allWords, setAllWords] = useState<any[]>([]); // すべての単語データ
+  const [currentIndex, setCurrentIndex] = useState(0); // 現在表示中の単語のインデックス
+  const [isFlipped, setIsFlipped] = useState(false); // カード表示状態（表面:false/裏面:true）
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバーの開閉状態
+  const [[page, direction], setPage] = useState([0, 0]); // ページ遷移の方向を記録（アニメーション用）
+  const isTransitioning = useRef(false); // アニメーション実行中フラグ（重複アクション防止）
+  
+  // 【サイドバースワイプ検出】
+  const sidebarTouchStartRef = useRef<number>(0); // スワイプ開始位置
+  const handleSidebarTouchStart = useCallback((e: React.TouchEvent) => {
+    sidebarTouchStartRef.current = e.touches[0].clientX;
+  }, []);
+
+  const handleSidebarTouchEnd = useCallback((e: React.TouchEvent) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchStartX = sidebarTouchStartRef.current;
+    const swipeDistance = touchStartX - touchEndX; // 右方向の移動距離（正数 = 左へのスワイプ）
+    
+    // 左方向へのスワイプ（50px以上）でサイドバーを閉じる
+    if (swipeDistance > 50) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
+  // 【初期化】GraphQLクエリでWordテーブルから単語データを取得
+  useEffect(() => {
+    const fetchWords = async () => {
+      try {
+        const result: any = await client.graphql({ query: listWords });
+        // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
+        const fetched = (result.data?.listWords?.items || []).map((w: any) => ({
+          ...w,
+          isVisible: w.status !== "hidden"
+        }))
+        // IDでソート（昇順）
+        .sort((a: any, b: any) => {
+          const idA = parseInt(a.id) || 0;
+          const idB = parseInt(b.id) || 0;
+          return idA - idB;
+        });
+        setAllWords(fetched);
+      } catch (e) { console.error(e); }
+    };
+    fetchWords();
+  }, []);
+
+  // 【フィルター】hiddenステータス以外の単語のみを抽出（学習対象の単語リスト）
+  const visibleWords = useMemo(() => allWords.filter(w => w.isVisible), [allWords]);
+
+  // 【次の単語へ移動】表面と裏面の切り替えと単語の進行を管理
+  const handleNext = useCallback(() => {
+    // アニメーション中または単語が無い場合は処理中止
+    if (isTransitioning.current || visibleWords.length === 0) return;
+    // 表面が表示されている場合：裏面を表示する
+    if (!isFlipped) {
+      setIsFlipped(true);
+    } else {
+      // 裏面が表示されている場合：次の単語へ進む
+      isTransitioning.current = true;
+      setCurrentIndex((prev) => (prev + 1) % visibleWords.length);
+      setPage([page + 1, 1]); // 右方向への遷移を記録
+      setIsFlipped(false); // 新しい単語の表面を表示
+      // アニメーション完了後にフラグを解除（300ms = アニメーション時間）
+      setTimeout(() => { isTransitioning.current = false; }, 300);
+    }
+  }, [isFlipped, visibleWords.length, page]);
+
+  // 【前の単語へ移動】handleNextの逆方向処理
+  const handlePrev = useCallback(() => {
+    if (isTransitioning.current || visibleWords.length === 0) return;
+    // 裏面が表示されている場合：表面を表示する
+    if (isFlipped) {
+      setIsFlipped(false);
+    } else {
+      // 表面が表示されている場合：前の単語へ進む
+      isTransitioning.current = true;
+      setCurrentIndex((prev) => (prev - 1 + visibleWords.length) % visibleWords.length);
+      setPage([page - 1, -1]); // 左方向への遷移を記録
+      setIsFlipped(true); // 新しい単語の裏面を表示
+      setTimeout(() => { isTransitioning.current = false; }, 300);
+    }
+  }, [isFlipped, visibleWords.length, page]);
+
+  // 【キーボード操作】矢印キーとスペースキーでカード操作
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 右矢印キー or スペースキー：次へ進む
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); handleNext(); }
+      // 左矢印キー：前へ戻る
+      if (e.key === "ArrowLeft") { e.preventDefault(); handlePrev(); }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleNext, handlePrev]);
+
+  // 【スワイプ判定】ドラッグ終了時に距離と速度から次/前の単語へ移動するか判定
+  const handleDragEnd = useCallback((event: any, info: any) => {
+    const swipeThreshold = 50; // スワイプと判定する最小距離（ピクセル）
+    const velocityThreshold = 500; // スワイプと判定する最小速度
+    
+    // 右方向へのスワイプ（前の単語へ）
+    if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+      handlePrev();
+    }
+    // 左方向へのスワイプ（次の単語へ）
+    else if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+      handleNext();
+    }
+  }, [handleNext, handlePrev]);
+
+  // 【初期化チェック】データ未読み込み時はレンダリングしない
+  if (allWords.length === 0) return null;
+  // 現在表示する単語を決定（表示用インデックス優先、フォールバック用）
+  const word = visibleWords[currentIndex] || visibleWords[0];
+  // 単語データが存在しない場合は表示しない
+  if (!word) return null;
+
+  // 【表示番号の計算】非表示を除いたリストでの位置ではなく、すべての単語での位置を表示
+  const realNumber = allWords.findIndex(aw => aw.id === word.id) + 1;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="fixed inset-0 bg-slate-50 flex overflow-hidden font-sans text-slate-900">
+      {/* 【オーバーレイ】モバイル版：サイドバー表示時の背景を暗くする */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 z-[450] md:hidden" onClick={() => setIsSidebarOpen(false)} />
+      )}
+
+      {/* 【メニューボタン】ハンバーガーメニュー：z-indexを[700]に設定して最前面に配置 */}
+      <div className="fixed top-4 left-4 z-[700]">
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-3 bg-white shadow-xl rounded-2xl text-slate-600 active:scale-95 transition-transform">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      {/* 【サイドバー】全単語リストを表示、選択した単語へ移動 */}
+      <aside 
+        className={`h-full bg-white border-r border-slate-200 transition-all duration-300 z-[500] flex-shrink-0 overflow-hidden fixed md:relative ${isSidebarOpen ? "w-[280px]" : "w-0"}`}
+        onTouchStart={handleSidebarTouchStart}
+        onTouchEnd={handleSidebarTouchEnd}
+      >
+        <div className="w-[280px] h-full flex flex-col">
+          {/* サイドバーヘッダー */}
+          <div className="mt-20 px-6 py-4 border-b border-slate-50">
+            <h2 className="text-slate-400 text-xs font-black tracking-widest uppercase truncate">単語リスト</h2>
+          </div>
+          {/* 単語一覧のスクロール領域 */}
+          <nav className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+            {allWords.map((w, idx) => (
+              <div key={w.id} className={`flex items-center rounded-xl mb-1 border transition-all ${(word?.id === w.id) ? "bg-blue-50 border-blue-200" : "bg-transparent border-transparent"}`}>
+                {/* 単語ボタン：クリックで該当単語へジャンプ */}
+                <button onClick={() => { if (w.isVisible) { const visibleIndex = visibleWords.findIndex(vw => vw.id === w.id); if (visibleIndex !== -1) setCurrentIndex(visibleIndex); setIsFlipped(false); } }} className="flex-1 text-left px-4 py-3 text-sm truncate font-bold text-slate-700">
+                  <span className="opacity-30 mr-2 font-mono text-xs">{idx + 1}</span>
+                  {w.word}
+                </button>
+              </div>
+            ))}
+          </nav>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </aside>
+
+      {/* 【メインエリア】カード表示と操作エリア */}
+      <main className="flex-1 relative bg-blue-50/30 flex items-center justify-center p-4 overflow-hidden">
+        
+        {/* 【カード表示エリア】フリップアニメーション付きカード */}
+        <div className="relative w-full max-w-5xl h-[75vh] z-[100]">
+          {/* AnimatePresence：カード遷移時のアニメーション制御 */}
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            {/* カード：cardVariantsの定義に従ってスライドアニメーション + スワイプ対応 */}
+            <motion.div
+              key={word.id}
+              custom={direction}
+              variants={cardVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ x: { type: "spring", stiffness: 90000, damping: 500 }, opacity: { duration: 0.2 } }}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.2}
+              onDragEnd={handleDragEnd}
+              className="w-full h-full"
+            >
+              {/* 【3Dカード】perspective設定でY軸回転により表裏が切り替わる */}
+              <div 
+                className="relative w-full h-full shadow-[0_40px_80px_rgba(0,0,0,0.08)] rounded-[3rem] bg-white transition-transform duration-90 ease-out" 
+                style={{ transformStyle: "preserve-3d", transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
+              >
+                {/* カード表面 */}
+                <div className="absolute inset-0 backface-hidden flex flex-col rounded-[3rem] bg-white" style={{ backfaceVisibility: "hidden" }}>
+                  {/* 背景番号 */}
+                  <div className="absolute top-10 left-12 font-black text-6xl md:text-8xl italic text-slate-300 select-none pointer-events-none">#{realNumber}</div>
+                  
+                  {/* 左右判定レイヤー */}
+                  <div className="absolute inset-0 flex">
+                    <div className="w-[50%] cursor-w-resize group flex items-center justify-start pl-2" onClick={handlePrev}>
+                      <div className="p-4 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-0 md:opacity-85 md:group-hover:text-slate-700 md:group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="w-[50%] cursor-e-resize group flex items-center justify-end pr-2" onClick={handleNext}>
+                      <div className="p-4 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-0 md:opacity-85 md:group-hover:text-slate-700 md:group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 中央に単語を表示 */}
+                  <div className="flex-1 flex flex-col items-center justify-center px-12 text-center pointer-events-none">
+                    <h1 className="font-black text-slate-900 leading-none tracking-tighter select-none" style={{ fontSize: 'clamp(2rem, 8vw, 5rem)' }}>{word.word}</h1>
+                  </div>
+                  {/* 進捗表示 */}
+                  <div className="absolute bottom-10 w-full pointer-events-none">
+                    {/* PC版：テキストのみ */}
+                    <div className="hidden md:block text-center text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
+                      {currentIndex + 1} {'/'} {visibleWords.length} | 表面
+                    </div>
+                    {/* スマホ版：矢印付き */}
+                    <div className="md:hidden flex items-center justify-center gap-4 pointer-events-auto">
+                      <button onClick={handlePrev} className="w-11 h-11 flex items-center justify-center group">
+                        <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                          </svg>
+                        </span>
+                      </button>
+                      <span className="text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
+                        {currentIndex + 1} {'/'} {visibleWords.length} | 表面
+                      </span>
+                      <button onClick={handleNext} className="w-11 h-11 flex items-center justify-center group">
+                        <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* カード裏面 */}
+                <div className="absolute inset-0 flex flex-col rounded-[3rem] bg-white overflow-hidden shadow-inner" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
+                  {/* 背景番号 */}
+                  <div className="absolute top-10 left-12 font-black text-6xl md:text-8xl italic text-slate-300 select-none">#{realNumber}</div>
+                  
+                  {/* コンテンツエリア */}
+                  <div className="relative flex flex-col h-full px-8 md:px-20 py-16 pt-28">
+                    {/* ヘッダー */}
+                    <div className="relative text-center mb-6 flex-shrink-0 pointer-events-none">
+                      <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
+                      <h2 className="text-3xl md:text-5xl font-black text-blue-600 leading-tight select-none">{word.meaning}</h2>
+                    </div>
+
+                    {/* 左右判定レイヤー（ヘッダーと下部の統合） */}
+                    <div className="absolute inset-x-0 top-0 bottom-0 flex pointer-events-none" style={{ top: '0', bottom: '0' }}>
+                      <div className="w-[50%] cursor-w-resize group flex items-center justify-start pl-2 pointer-events-auto" onClick={handlePrev}>
+                        <div className="p-4 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-0 md:opacity-85 md:group-hover:text-slate-700 md:group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="w-[50%] cursor-e-resize group flex items-center justify-end pr-2 pointer-events-auto" onClick={handleNext}>
+                        <div className="p-4 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-0 md:opacity-85 md:group-hover:text-slate-700 md:group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* スクロールエリア */}
+                    <div 
+                      className="scrollable-bg relative flex-1 overflow-y-auto pr-2 custom-scrollbar border-t border-slate-50 pt-8 space-y-6 pointer-events-auto"
+                      style={{ zIndex: 1000, touchAction: "pan-y" }}
+                    >
+                      {/* 詳細説明 */}
+                      {word.description && (
+                        <div className="px-2">
+                          <span className="text-slate-400 font-black text-[10px] tracking-widest block mb-3 select-none">詳細</span>
+                          <p className="text-sm md:text-base text-slate-700 font-bold leading-relaxed whitespace-pre-wrap">{word.description}</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* 進捗表示 */}
+                    <div className="relative mt-6 pointer-events-none">
+                      {/* PC版：テキストのみ */}
+                      <div className="hidden md:block text-center text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
+                        {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
+                      </div>
+                      {/* スマホ版：矢印付き */}
+                      <div className="md:hidden flex items-center justify-center gap-4 pointer-events-auto">
+                        <button onClick={handlePrev} className="w-11 h-11 flex items-center justify-center group">
+                          <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                          </span>
+                        </button>
+                        <span className="text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
+                          {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
+                        </span>
+                        <button onClick={handleNext} className="w-11 h-11 flex items-center justify-center group">
+                          <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* 広告スペース */}
+        <div className="absolute bottom-4 left-4 right-4 h-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center z-[100]">
+          <span className="text-slate-300 text-[10px] font-black tracking-widest select-none">広告スペース</span>
+        </div>
+
+        {/* カード外の判定レイヤー */}
+        <div className="absolute inset-0 flex pointer-events-none z-[10]" style={{ height: '100vh' }}>
+          {/* 左操作エリア */}
+          <div 
+            className="w-[50%] pointer-events-auto cursor-w-resize" 
+            onClick={handlePrev}
+          />
+          
+          {/* 右操作エリア */}
+          <div 
+            className="w-[50%] pointer-events-auto cursor-e-resize" 
+            onClick={handleNext}
+          />
         </div>
       </main>
+
+      {/* グローバルスタイル */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .scrollable-bg {
+          background: rgba(147, 197, 253, 0.10);
+          border-radius: 1.5rem;
+          padding: 1rem;
+          transition: background 0.2s;
+        }
+        .scrollable-bg:hover, .scrollable-bg:focus-within {
+          background: rgba(147, 197, 253, 0.15);
+        }
+      `}</style>
     </div>
   );
 }

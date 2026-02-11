@@ -9,6 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-amplify/adapter-nextjs": "^1.7.1",
+    "@aws-sdk/client-dynamodb": "^3.985.0",
+    "@aws-sdk/lib-dynamodb": "^3.985.0",
+    "aws-amplify": "^6.16.2",
+    "csv-parse": "^6.1.0",
+    "framer-motion": "^12.29.2",
     "next": "16.1.4",
     "react": "19.2.3",
     "react-dom": "19.2.3"

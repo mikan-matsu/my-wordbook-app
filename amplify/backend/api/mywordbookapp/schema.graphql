@@ -1,0 +1,10 @@
+type Word @model @auth(rules: [{ allow: public }]) {
+  id: ID! @primaryKey
+  word: String!
+  meaning: String!
+  category_ids: [Int]!
+  supplement: String  
+  example: String
+  description: String
+  status: Int! @index(name: "byStatus", queryField: "wordsByStatus")
+}
