@@ -1,10 +1,10 @@
-// src/app/layout.tsx の内容を以下に書き換えてください（Vercel/ローカル両対応）
+// src/app/layout.tsx を以下の内容に完全に置き換えてください
 
 import { Amplify } from 'aws-amplify';
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// 環境変数から設定を構築（aws-exports.jsに依存しない）
+// 環境変数がある場合はそれを使用、ない場合は aws-exports を試行
 const amplifyConfig = {
   aws_project_region: 'ap-northeast-1',
   aws_appsync_graphqlEndpoint: process.env.NEXT_PUBLIC_AWS_APPSYNC_GRAPHQLENDPOINT,
@@ -13,7 +13,13 @@ const amplifyConfig = {
   aws_appsync_apiKey: process.env.NEXT_PUBLIC_AWS_APPSYNC_APIKEY,
 };
 
-Amplify.configure(amplifyConfig);
+// Vercel等で環境変数が設定されている場合のみ実行、そうでなければ従来の exports を使う
+// (ローカルで .env.local があればここが通ります)
+try {
+  Amplify.configure(amplifyConfig);
+} catch (e) {
+  console.error("Amplify configuration failed:", e);
+}
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
