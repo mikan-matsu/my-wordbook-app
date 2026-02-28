@@ -5,15 +5,10 @@ import { Amplify } from "aws-amplify";
 import { generateClient } from "aws-amplify/api";
 import { listWords } from "../graphql/queries";
 import { motion, AnimatePresence, Variants } from "framer-motion";
+import awsExports from "../aws-exports";
 
-// Amplifyの設定を初期化（直接定義で確実に読み込む）
-Amplify.configure({
-  aws_project_region: "ap-northeast-1",
-  aws_appsync_graphqlEndpoint: "https://hsxqvvvz7fbgza55ea2pzk4gqq.appsync-api.ap-northeast-1.amazonaws.com/graphql",
-  aws_appsync_region: "ap-northeast-1",
-  aws_appsync_authenticationType: "API_KEY",
-  aws_appsync_apiKey: "da2-wwlvkji5afhppfp5lin6z7ksku"
-});
+// Amplifyの設定を初期化
+Amplify.configure(awsExports);
 
 // 【Amplify GraphQLクライアント】AWS AppSyncと通信するためのクライアント
 const client = generateClient();
