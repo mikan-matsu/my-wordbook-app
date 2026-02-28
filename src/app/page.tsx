@@ -2,13 +2,18 @@
 "use client";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Amplify } from "aws-amplify";
-import awsmobile from "../aws-exports";
 import { generateClient } from "aws-amplify/api";
 import { listWords } from "../graphql/queries";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
-// Amplifyの設定を初期化
-Amplify.configure(awsmobile);
+// Amplifyの設定を初期化（直接定義で確実に読み込む）
+Amplify.configure({
+  aws_project_region: "ap-northeast-1",
+  aws_appsync_graphqlEndpoint: "https://hsxqvvvz7fbgza55ea2pzk4gqq.appsync-api.ap-northeast-1.amazonaws.com/graphql",
+  aws_appsync_region: "ap-northeast-1",
+  aws_appsync_authenticationType: "API_KEY",
+  aws_appsync_apiKey: "da2-wwlvkji5afhppfp5lin6z7ksku"
+});
 
 // 【Amplify GraphQLクライアント】AWS AppSyncと通信するためのクライアント
 const client = generateClient();
@@ -140,8 +145,15 @@ export default function Home() {
     }
   }, [handleNext, handlePrev]);
 
-  // 【初期化チェック】データ未読み込み時はレンダリングしない
-  if (allWords.length === 0) return null;
+  // 【初期化チェック】データ未読み込み時はローディング表示
+  if (allWords.length === 0) return (
+    <div className="fixed inset-0 bg-slate-50 flex items-center justify-center font-sans text-slate-900">
+      <div className="text-center">
+        <div className="text-4xl font-bold text-blue-400 mb-4">AWS WordCard</div>
+        <div className="text-slate-400">Loading...</div>
+      </div>
+    </div>
+  );
   // 現在表示する単語を決定（表示用インデックス優先、フォールバック用）
   const word = visibleWords[currentIndex] || visibleWords[0];
   // 単語データが存在しない場合は表示しない
