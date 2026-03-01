@@ -1,16 +1,12 @@
 // 【クライアントコンポーネント】React Hooksを使用するため"use client"が必須
 "use client";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { Amplify } from "aws-amplify";
 import { generateClient } from "aws-amplify/api";
 import { listWords } from "../graphql/queries";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import awsExports from "../aws-exports";
-
-// SSR対応設定を適用
-Amplify.configure(awsExports, { ssr: true });
 
 // 【Amplify GraphQLクライアント】AWS AppSyncと通信するためのクライアント（遅延初期化対応）
+// Amplify.configure()はlayout.tsxのConfigureAmplifyClientコンポーネントで実行済み
 let client: any = null;
 
 const getClient = () => {
