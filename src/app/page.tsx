@@ -60,11 +60,20 @@ export default function Home() {
   // 【初期化】GraphQLクエリでWordテーブルから単語データを取得
   useEffect(() => {
     const fetchWords = async () => {
+      console.log('🔍 fetchWords開始: generateClient()を呼び出し中...');
       try {
         const apiClient = getClient();
+        console.log('✅ apiClient取得完了:', typeof apiClient);
+        
+        console.log('📡 GraphQL APIリクエスト送信中...');
         const result: any = await apiClient.graphql({ query: listWords });
+        console.log('✅ APIレスポンス受信:', result);
+        
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
-        const fetched = (result.data?.listWords?.items || []).map((w: any) => ({
+        const items = result.data?.listWords?.items || [];
+        console.log('📊 取得したアイテム数:', items.length);
+        
+        const fetched = items.map((w: any) => ({
           ...w,
           isVisible: w.status !== "hidden"
         }))
@@ -74,8 +83,12 @@ export default function Home() {
           const idB = parseInt(b.id) || 0;
           return idA - idB;
         });
+        console.log('✅ データ処理完了。setAllWordsを実行:', fetched.length, '件');
         setAllWords(fetched);
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error('❌ fetchWords エラー:', e);
+        console.error('詳細:', JSON.stringify(e, null, 2));
+      }
     };
     fetchWords();
   }, []);
