@@ -7,11 +7,18 @@ import { listWords } from "../graphql/queries";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import awsExports from "../aws-exports";
 
-// Amplifyの設定を初期化
-Amplify.configure(awsExports);
+// SSR対応設定を適用
+Amplify.configure(awsExports, { ssr: true });
 
-// 【Amplify GraphQLクライアント】AWS AppSyncと通信するためのクライアント
-const client = generateClient();
+// 【Amplify GraphQLクライアント】AWS AppSyncと通信するためのクライアント（遅延初期化対応）
+let client: any = null;
+
+const getClient = () => {
+  if (!client) {
+    client = generateClient();
+  }
+  return client;
+};
 
 // 【カード・アニメーション設定】前後の方向に応じてカードがスライドインして表示される
 const cardVariants: Variants = {
@@ -58,7 +65,8 @@ export default function Home() {
   useEffect(() => {
     const fetchWords = async () => {
       try {
-        const result: any = await client.graphql({ query: listWords });
+        const apiClient = getClient();
+        const result: any = await apiClient.graphql({ query: listWords });
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
         const fetched = (result.data?.listWords?.items || []).map((w: any) => ({
           ...w,
