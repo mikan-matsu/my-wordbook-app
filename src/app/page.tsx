@@ -1,20 +1,11 @@
 // 【クライアントコンポーネント】React Hooksを使用するため"use client"が必須
 "use client";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { Amplify } from "aws-amplify";
 import { generateClient } from "aws-amplify/api";
 import { listWords } from "../graphql/queries";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-
-// 【Amplify GraphQLクライアント】AWS AppSyncと通信するためのクライアント（遅延初期化対応）
-// Amplify.configure()はlayout.tsxのConfigureAmplifyClientコンポーネントで実行済み
-let client: any = null;
-
-const getClient = () => {
-  if (!client) {
-    client = generateClient();
-  }
-  return client;
-};
+import awsExports from "../aws-exports";
 
 // 【カード・アニメーション設定】前後の方向に応じてカードがスライドインして表示される
 const cardVariants: Variants = {
@@ -61,7 +52,11 @@ export default function Home() {
   useEffect(() => {
     const fetchWords = async () => {
       try {
-        const apiClient = getClient();
+        // Amplify初期化（page.tsx内で確実に初期化）
+        Amplify.configure(awsExports, { ssr: true });
+        
+        // 初期化完了後にクライアント生成
+        const apiClient = generateClient();
         const result: any = await apiClient.graphql({ query: listWords });
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
         const fetched = (result.data?.listWords?.items || []).map((w: any) => ({
