@@ -51,13 +51,20 @@ export default function Home() {
   // 【初期化】GraphQLクエリでWordテーブルから単語データを取得
   useEffect(() => {
     const fetchWords = async () => {
+      console.log("🔵 fetch開始");
       try {
         // Amplify初期化（page.tsx内で確実に初期化）
         Amplify.configure(awsExports, { ssr: true });
+        console.log("✅ Amplify.configure完了");
         
         // 初期化完了後にクライアント生成
         const apiClient = generateClient();
+        console.log("✅ generateClient完了");
+        
         const result: any = await apiClient.graphql({ query: listWords });
+        console.log("✅ GraphQL リクエスト成功");
+        console.log("📊 取得結果:", result);
+        
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
         const fetched = (result.data?.listWords?.items || []).map((w: any) => ({
           ...w,
@@ -69,8 +76,17 @@ export default function Home() {
           const idB = parseInt(b.id) || 0;
           return idA - idB;
         });
+        
+        if (fetched.length === 0) {
+          console.warn("⚠️ No words found in DynamoDB");
+        } else {
+          console.log(`✅ ${fetched.length}件のデータを取得`);
+        }
+        
         setAllWords(fetched);
-      } catch (e) { console.error(e); }
+      } catch (e) { 
+        console.error("❌ エラー詳細:", e);
+      }
     };
     fetchWords();
   }, []);
