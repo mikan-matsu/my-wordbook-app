@@ -25,6 +25,7 @@ const cardVariants: Variants = {
 export default function Home() {
   // 【状態管理】
   const [allWords, setAllWords] = useState<any[]>([]); // すべての単語データ
+  const [isLoaded, setIsLoaded] = useState(false); // データ取得完了フラグ
   const [currentIndex, setCurrentIndex] = useState(0); // 現在表示中の単語のインデックス
   const [isFlipped, setIsFlipped] = useState(false); // カード表示状態（表面:false/裏面:true）
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバーの開閉状態
@@ -53,6 +54,13 @@ export default function Home() {
     const fetchWords = async () => {
       console.log("🔵 fetch開始");
       try {
+        // 【接続情報の詳細出力】
+        console.log("DEBUG: Connection Info:", {
+          endpoint: awsExports.aws_appsync_graphqlEndpoint,
+          region: awsExports.aws_appsync_region,
+          apiKey: awsExports.aws_appsync_apiKey ? "PRESENT" : "MISSING"
+        });
+        
         // Amplify初期化（page.tsx内で確実に初期化）
         Amplify.configure(awsExports, { ssr: true });
         console.log("✅ Amplify.configure完了");
@@ -63,7 +71,9 @@ export default function Home() {
         
         const result: any = await apiClient.graphql({ query: listWords });
         console.log("✅ GraphQL リクエスト成功");
-        console.log("📊 取得結果:", result);
+        
+        // 【取得データの詳細解析】
+        console.log("DEBUG: Raw GraphQL Result:", JSON.stringify(result, null, 2));
         
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
         const fetched = (result.data?.listWords?.items || []).map((w: any) => ({
@@ -86,6 +96,9 @@ export default function Home() {
         setAllWords(fetched);
       } catch (e) { 
         console.error("❌ エラー詳細:", e);
+      } finally {
+        // データ取得が終わったら、0件でも必ずLoadingを抜ける
+        setIsLoaded(true);
       }
     };
     fetchWords();
@@ -155,12 +168,25 @@ export default function Home() {
     }
   }, [handleNext, handlePrev]);
 
-  // 【初期化チェック】データ未読み込み時はローディング表示
-  if (allWords.length === 0) return (
+  // 【初期化チェック】データ取得中はローディング表示
+  if (!isLoaded) return (
     <div className="fixed inset-0 bg-slate-50 flex items-center justify-center font-sans text-slate-900">
       <div className="text-center">
         <div className="text-4xl font-bold text-blue-400 mb-4">AWS WordCard</div>
         <div className="text-slate-400">Loading...</div>
+      </div>
+    </div>
+  );
+
+  // 【データなし表示】取得完了後も0件の場合
+  if (isLoaded && allWords.length === 0) return (
+    <div className="fixed inset-0 bg-slate-50 flex items-center justify-center font-sans text-slate-900">
+      <div className="text-center px-6">
+        <div className="text-4xl font-bold text-blue-400 mb-4">AWS WordCard</div>
+        <div className="text-slate-600 leading-relaxed">
+          <p className="mb-2">表示できる単語がありません。</p>
+          <p className="text-sm text-slate-400">DynamoDBのテーブル名と中身を確認してください。</p>
+        </div>
       </div>
     </div>
   );
