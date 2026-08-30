@@ -3,11 +3,7 @@ backend:
   phases:
     build:
       commands:
-        - node --version
-        - npm --version
         - npm install
-        - ls -la amplify amplify/data
-        - npx ampx --version
         - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
 frontend:
   phases:
