@@ -2,10 +2,10 @@
 "use client";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Amplify } from "aws-amplify";
-import { generateClient } from "aws-amplify/api";
-import { listWords } from "../graphql/queries";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import awsExports from "../aws-exports";
+import outputs from "../../amplify_outputs.json";
 
 // 【カード・アニメーション設定】前後の方向に応じてカードがスライドインして表示される
 const cardVariants: Variants = {
@@ -49,34 +49,25 @@ export default function Home() {
     }
   }, []);
 
-  // 【初期化】GraphQLクエリでWordテーブルから単語データを取得
+  // 【初期化】Amplify Dataクライアントでwordテーブルから単語データを取得
   useEffect(() => {
     const fetchWords = async () => {
-      console.log("🔵 fetch開始");
       try {
-        // 【接続情報の詳細出力】
-        console.log("DEBUG: Connection Info:", {
-          endpoint: awsExports.aws_appsync_graphqlEndpoint,
-          region: awsExports.aws_appsync_region,
-          apiKey: awsExports.aws_appsync_apiKey ? "PRESENT" : "MISSING"
+        Amplify.configure(outputs, { ssr: true });
+        const client = generateClient<Schema>();
+
+        const { data: items, errors } = await client.models.Word.list({
+          filter: {
+            or: [
+              { del_flg: { ne: 1 } },
+              { del_flg: { attributeExists: false } }
+            ]
+          }
         });
-        
-        // Amplify初期化（page.tsx内で確実に初期化）
-        Amplify.configure(awsExports, { ssr: true });
-        console.log("✅ Amplify.configure完了");
-        
-        // 初期化完了後にクライアント生成
-        const apiClient = generateClient();
-        console.log("✅ generateClient完了");
-        
-        const result: any = await apiClient.graphql({ query: listWords });
-        console.log("✅ GraphQL リクエスト成功");
-        
-        // 【取得データの詳細解析】
-        console.log("DEBUG: Raw GraphQL Result:", JSON.stringify(result, null, 2));
-        
+        if (errors) console.error("GraphQL errors:", errors);
+
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
-        const fetched = (result.data?.listWords?.items || []).map((w: any) => ({
+        const fetched = (items || []).map((w: any) => ({
           ...w,
           isVisible: w.status !== "hidden"
         }))
@@ -86,16 +77,10 @@ export default function Home() {
           const idB = parseInt(b.id) || 0;
           return idA - idB;
         });
-        
-        if (fetched.length === 0) {
-          console.warn("⚠️ No words found in DynamoDB");
-        } else {
-          console.log(`✅ ${fetched.length}件のデータを取得`);
-        }
-        
+
         setAllWords(fetched);
-      } catch (e) { 
-        console.error("❌ エラー詳細:", e);
+      } catch (e) {
+        console.error("エラー詳細:", e);
       } finally {
         // データ取得が終わったら、0件でも必ずLoadingを抜ける
         setIsLoaded(true);
