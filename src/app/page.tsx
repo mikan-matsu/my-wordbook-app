@@ -62,9 +62,9 @@ export default function Home() {
 
         // 【全件取得】nextTokenがある限りページングして全単語を取得する
         let items: any[] = [];
-        let nextToken: string | null | undefined = undefined;
+        let cursor: string | null | undefined = undefined;
         do {
-          const { data, errors, nextToken: nt } = await client.models.Word.list({
+          const result: any = await client.models.Word.list({
             filter: {
               or: [
                 { del_flg: { ne: 1 } },
@@ -72,12 +72,12 @@ export default function Home() {
               ]
             },
             limit: 1000,
-            nextToken,
+            nextToken: cursor,
           });
-          if (errors) console.error("GraphQL errors:", errors);
-          items = items.concat(data || []);
-          nextToken = nt;
-        } while (nextToken);
+          if (result.errors) console.error("GraphQL errors:", result.errors);
+          items = items.concat(result.data || []);
+          cursor = result.nextToken;
+        } while (cursor);
 
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
         const fetched = (items || []).map((w: any) => ({
