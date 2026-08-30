@@ -22,6 +22,9 @@ const cardVariants: Variants = {
   }),
 };
 
+// 【カテゴリ一覧】"すべて"は絞り込み解除を表す特別値
+const CATEGORIES = ["すべて", "基本用語", "ネットワーク用語", "コンピューティング", "セキュリティ関連"];
+
 export default function Home() {
   // 【状態管理】
   const [allWords, setAllWords] = useState<any[]>([]); // すべての単語データ
@@ -29,6 +32,7 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0); // 現在表示中の単語のインデックス
   const [isFlipped, setIsFlipped] = useState(false); // カード表示状態（表面:false/裏面:true）
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバーの開閉状態
+  const [selectedCategory, setSelectedCategory] = useState<string>("すべて"); // 選択中のカテゴリ
   const [[page, direction], setPage] = useState([0, 0]); // ページ遷移の方向を記録（アニメーション用）
   const isTransitioning = useRef(false); // アニメーション実行中フラグ（重複アクション防止）
   
@@ -56,15 +60,24 @@ export default function Home() {
         Amplify.configure(outputs, { ssr: true });
         const client = generateClient<Schema>();
 
-        const { data: items, errors } = await client.models.Word.list({
-          filter: {
-            or: [
-              { del_flg: { ne: 1 } },
-              { del_flg: { attributeExists: false } }
-            ]
-          }
-        });
-        if (errors) console.error("GraphQL errors:", errors);
+        // 【全件取得】nextTokenがある限りページングして全単語を取得する
+        let items: any[] = [];
+        let nextToken: string | null | undefined = undefined;
+        do {
+          const { data, errors, nextToken: nt } = await client.models.Word.list({
+            filter: {
+              or: [
+                { del_flg: { ne: 1 } },
+                { del_flg: { attributeExists: false } }
+              ]
+            },
+            limit: 1000,
+            nextToken,
+          });
+          if (errors) console.error("GraphQL errors:", errors);
+          items = items.concat(data || []);
+          nextToken = nt;
+        } while (nextToken);
 
         // 取得したデータをマッピング：hiddenステータスの単語は非表示フラグを設定
         const fetched = (items || []).map((w: any) => ({
@@ -89,8 +102,17 @@ export default function Home() {
     fetchWords();
   }, []);
 
-  // 【フィルター】hiddenステータス以外の単語のみを抽出（学習対象の単語リスト）
-  const visibleWords = useMemo(() => allWords.filter(w => w.isVisible), [allWords]);
+  // 【フィルター】hiddenステータス以外・選択中カテゴリの単語のみを抽出（学習対象の単語リスト）
+  const visibleWords = useMemo(
+    () => allWords.filter(w => w.isVisible && (selectedCategory === "すべて" || w.category === selectedCategory)),
+    [allWords, selectedCategory]
+  );
+
+  // 【カテゴリ切り替え】絞り込みが変わったら表示位置を先頭に戻す
+  useEffect(() => {
+    setCurrentIndex(0);
+    setIsFlipped(false);
+  }, [selectedCategory]);
 
   // 【次の単語へ移動】表面と裏面の切り替えと単語の進行を管理
   const handleNext = useCallback(() => {
@@ -180,8 +202,8 @@ export default function Home() {
   // 単語データが存在しない場合は表示しない
   if (!word) return null;
 
-  // 【表示番号の計算】非表示を除いたリストでの位置ではなく、すべての単語での位置を表示
-  const realNumber = allWords.findIndex(aw => aw.id === word.id) + 1;
+  // 【表示番号の計算】選択中カテゴリの絞り込みリストでの位置を表示
+  const realNumber = currentIndex + 1;
 
   return (
     <div className="fixed inset-0 bg-slate-50 flex overflow-hidden font-sans text-slate-900">
@@ -210,12 +232,24 @@ export default function Home() {
           <div className="mt-20 px-6 py-4 border-b border-slate-50">
             <h2 className="text-slate-400 text-xs font-black tracking-widest uppercase truncate">単語リスト</h2>
           </div>
+          {/* カテゴリフィルター */}
+          <div className="px-3 py-3 border-b border-slate-50 flex flex-wrap gap-1.5">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? "bg-blue-400 text-white" : "bg-slate-100 text-slate-500"}`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
           {/* 単語一覧のスクロール領域 */}
           <nav className="flex-1 overflow-y-auto p-3 custom-scrollbar">
-            {allWords.map((w, idx) => (
+            {visibleWords.map((w, idx) => (
               <div key={w.id} className={`flex items-center rounded-xl mb-1 border transition-all ${(word?.id === w.id) ? "bg-blue-50 border-blue-200" : "bg-transparent border-transparent"}`}>
                 {/* 単語ボタン：クリックで該当単語へジャンプ */}
-                <button onClick={() => { if (w.isVisible) { const visibleIndex = visibleWords.findIndex(vw => vw.id === w.id); if (visibleIndex !== -1) setCurrentIndex(visibleIndex); setIsFlipped(false); } }} className="flex-1 text-left px-4 py-3 text-sm truncate font-bold text-slate-700">
+                <button onClick={() => { setCurrentIndex(idx); setIsFlipped(false); }} className="flex-1 text-left px-4 py-3 text-sm truncate font-bold text-slate-700">
                   <span className="opacity-30 mr-2 font-mono text-xs">{idx + 1}</span>
                   {w.word}
                 </button>

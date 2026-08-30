@@ -6,7 +6,7 @@ const schema = a.schema({
       id: a.id().required(),
       word: a.string().required(),
       meaning: a.string().required(),
-      category_ids: a.integer().array().required(),
+      category: a.string(),
       del_flg: a.integer(),
       supplement: a.string(),
       example: a.string(),
