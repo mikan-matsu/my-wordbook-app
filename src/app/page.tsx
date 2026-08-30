@@ -230,7 +230,7 @@ export default function Home() {
         
         {/* 【アプリタイトル】カード領域内で中央配置 */}
         <div className="absolute top-8 left-1/2 z-[200] flex items-center h-12 transition-all duration-300 transform -translate-x-1/2 pointer-events-none">
-          <h1 className={`font-extrabold tracking-wide select-none flex items-center gap-3 text-blue-400 transition-all duration-300 whitespace-nowrap text-3xl ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
+          <h1 className={`font-extrabold tracking-wide select-none flex items-center gap-3 text-blue-400 transition-all duration-300 whitespace-nowrap text-xl sm:text-2xl ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
             AWS WordCard
           </h1>
         </div>
