@@ -533,7 +533,12 @@ export default function Home() {
                     {/* ヘッダー */}
                     <div className="relative text-center mb-6 flex-shrink-0 pointer-events-none">
                       <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
-                      <h2 className="text-3xl md:text-5xl font-black text-blue-600 leading-tight select-none">{word.meaning}</h2>
+                      <h2
+                        className="font-black text-blue-600 leading-tight select-none text-balance"
+                        style={{ fontSize: word.meaning.length > 20 ? "clamp(1.25rem, 4.5vw, 2.5rem)" : "clamp(1.5rem, 6vw, 3rem)" }}
+                      >
+                        {word.meaning}
+                      </h2>
                     </div>
 
                     {/* 左右判定レイヤー（ヘッダーと下部の統合） */}
