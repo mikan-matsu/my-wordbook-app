@@ -322,7 +322,7 @@ export default function Home() {
       </div>
 
       {/* 【ログインボタン】未ログイン時はGoogleログイン、ログイン時はメールアドレスとログアウトボタンを表示 */}
-      <div className="fixed top-8 right-4 z-[700] flex flex-col items-end gap-1.5">
+      <div className="fixed top-8 right-6 z-[700] flex flex-col items-center gap-1">
         {!isAuthLoading && (
           authUser ? (
             <div className="flex items-center gap-2 bg-white shadow-xl rounded-2xl px-3 py-2">
@@ -333,8 +333,8 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <button onClick={handleGoogleLogin} className="flex items-center gap-2.5 bg-[#4285F4] hover:bg-[#3367d6] shadow-xl rounded-2xl px-5 py-3.5 text-white text-sm font-black active:scale-95 transition-all">
-                <span className="bg-white rounded-full p-1 flex items-center justify-center flex-shrink-0">
+              <button onClick={handleGoogleLogin} className="flex items-center gap-2 bg-[#4285F4] hover:bg-[#3367d6] shadow-xl rounded-full pl-1.5 pr-4 py-1.5 text-white text-sm font-bold active:scale-95 transition-all">
+                <span className="bg-white rounded-full p-1.5 flex items-center justify-center flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -344,8 +344,8 @@ export default function Home() {
                 </span>
                 <span className="hidden sm:inline">Googleでログイン</span>
               </button>
-              <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap select-none hidden sm:block">
-                ログインで進捗保存
+              <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap select-none hidden sm:block pr-1">
+                ログインで進捗を保存
               </span>
             </>
           )
@@ -398,7 +398,7 @@ export default function Home() {
       </aside>
 
       {/* 【メインエリア】カード表示と操作エリア */}
-      <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex items-center justify-center p-4 overflow-hidden transition-all duration-300">
+      <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-hidden transition-all duration-300">
         
         {/* 【アプリタイトル】カード領域内で中央配置 */}
         <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 transform -translate-x-1/2 pointer-events-none">
@@ -408,13 +408,13 @@ export default function Home() {
           {/* 【絞り込み中カテゴリ表示】「すべて」以外を選択中のみ表示 */}
           {selectedCategory !== "すべて" && (
             <span className="mt-1 px-3 py-1 rounded-full bg-blue-100 text-blue-500 text-[10px] font-black tracking-widest select-none whitespace-nowrap">
-              {selectedCategory} で絞り込み中
+              {selectedCategory}
             </span>
           )}
         </div>
         
         {/* 【カード表示エリア】フリップアニメーション付きカード */}
-        <div className="relative w-full max-w-5xl h-[75vh] z-[100]">
+        <div className="relative w-full max-w-5xl flex-1 min-h-0 z-[100]">
           {/* AnimatePresence：カード遷移時のアニメーション制御 */}
           <AnimatePresence initial={false} custom={direction} mode="popLayout">
             {/* カード：cardVariantsの定義に従ってスライドアニメーション + スワイプ対応 */}
@@ -609,7 +609,7 @@ export default function Home() {
         </div>
 
         {/* 広告スペース：AdSense未設定時はプレースホルダーを表示 */}
-        <div className="absolute bottom-4 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-5xl h-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center z-[100] overflow-hidden">
+        <div className="w-full max-w-5xl h-20 mt-4 flex-shrink-0 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center z-[100] overflow-hidden">
           {isAdEnabled ? (
             <ins
               className="adsbygoogle"
