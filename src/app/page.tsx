@@ -394,10 +394,16 @@ export default function Home() {
       <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex items-center justify-center p-4 overflow-hidden transition-all duration-300">
         
         {/* 【アプリタイトル】カード領域内で中央配置 */}
-        <div className="absolute top-8 left-1/2 z-[200] flex items-center h-12 transition-all duration-300 transform -translate-x-1/2 pointer-events-none">
-          <h1 className={`font-extrabold tracking-wide select-none flex items-center gap-3 text-blue-400 transition-all duration-300 whitespace-nowrap text-xl sm:text-2xl ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
+        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 transform -translate-x-1/2 pointer-events-none">
+          <h1 className={`font-extrabold tracking-wide select-none flex items-center gap-3 text-blue-400 transition-all duration-300 whitespace-nowrap text-xl sm:text-2xl h-12 ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
             AWS WordCard
           </h1>
+          {/* 【絞り込み中カテゴリ表示】「すべて」以外を選択中のみ表示 */}
+          {selectedCategory !== "すべて" && (
+            <span className="mt-1 px-3 py-1 rounded-full bg-blue-100 text-blue-500 text-[10px] font-black tracking-widest select-none whitespace-nowrap">
+              {selectedCategory} で絞り込み中
+            </span>
+          )}
         </div>
         
         {/* 【カード表示エリア】フリップアニメーション付きカード */}
