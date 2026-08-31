@@ -27,6 +27,17 @@ const schema = a.schema({
     })
     .identifier(['id'])
     .authorization((allow) => [allow.owner()]),
+
+  // ログインユーザー本人が追加した単語（マイ単語）。本人にのみ表示される。
+  MyWord: a
+    .model({
+      id: a.id().required(),
+      word: a.string().required(),
+      meaning: a.string().required(),
+      description: a.string(),
+    })
+    .identifier(['id'])
+    .authorization((allow) => [allow.owner()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

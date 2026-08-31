@@ -24,8 +24,9 @@ const cardVariants: Variants = {
   }),
 };
 
-// 【カテゴリ一覧】"すべて"は絞り込み解除を表す特別値
+// 【カテゴリ一覧】"すべて"は絞り込み解除を表す特別値。マイ単語はログイン時のみ表示に追加する
 const CATEGORIES = ["すべて", "基本用語", "ネットワーク用語", "コンピューティング", "セキュリティ関連"];
+const MY_WORD_CATEGORY = "マイ単語";
 
 // 【広告設定】未設定の場合はプレースホルダーを表示する
 const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
@@ -85,7 +86,7 @@ export default function Home() {
     }
     const fetchProgress = async () => {
       try {
-        const client = generateClient<Schema>();
+        const client = generateClient<Schema>({ authMode: "userPool" });
         let items: any[] = [];
         let cursor: string | null | undefined = undefined;
         do {
@@ -108,7 +109,7 @@ export default function Home() {
 
   const handleToggleLearned = useCallback(async (wordId: string) => {
     if (!authUser) return;
-    const client = generateClient<Schema>();
+    const client = generateClient<Schema>({ authMode: "userPool" });
     const existing = progressMap[wordId];
     const nextLearned = !existing?.learned;
     try {
@@ -124,7 +125,69 @@ export default function Home() {
       console.error("進捗更新エラー:", e);
     }
   }, [authUser, progressMap]);
-  
+
+  // 【マイ単語管理】ログインユーザー本人が追加した単語
+  const [myWords, setMyWords] = useState<any[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newWordForm, setNewWordForm] = useState({ word: "", meaning: "", description: "" });
+  const [isSavingWord, setIsSavingWord] = useState(false);
+
+  const fetchMyWords = useCallback(async () => {
+    if (!authUser) {
+      setMyWords([]);
+      return;
+    }
+    try {
+      const client = generateClient<Schema>({ authMode: "userPool" });
+      let items: any[] = [];
+      let cursor: string | null | undefined = undefined;
+      do {
+        const result: any = await client.models.MyWord.list({ limit: 1000, nextToken: cursor });
+        if (result.errors) console.error("GraphQL errors:", result.errors);
+        items = items.concat(result.data || []);
+        cursor = result.nextToken;
+      } while (cursor);
+      setMyWords(items);
+    } catch (e) {
+      console.error("マイ単語取得エラー:", e);
+    }
+  }, [authUser]);
+
+  useEffect(() => {
+    fetchMyWords();
+  }, [fetchMyWords]);
+
+  const handleAddMyWord = useCallback(async () => {
+    if (!authUser || !newWordForm.word.trim() || !newWordForm.meaning.trim()) return;
+    setIsSavingWord(true);
+    try {
+      const client = generateClient<Schema>({ authMode: "userPool" });
+      await client.models.MyWord.create({
+        id: `${Date.now()}_${authUser.username}`,
+        word: newWordForm.word.trim(),
+        meaning: newWordForm.meaning.trim(),
+        description: newWordForm.description.trim() || undefined,
+      });
+      setNewWordForm({ word: "", meaning: "", description: "" });
+      setIsAddModalOpen(false);
+      await fetchMyWords();
+    } catch (e) {
+      console.error("マイ単語追加エラー:", e);
+    } finally {
+      setIsSavingWord(false);
+    }
+  }, [authUser, newWordForm, fetchMyWords]);
+
+  const handleDeleteMyWord = useCallback(async (id: string) => {
+    try {
+      const client = generateClient<Schema>({ authMode: "userPool" });
+      await client.models.MyWord.delete({ id });
+      setMyWords((prev) => prev.filter((w) => w.id !== id));
+    } catch (e) {
+      console.error("マイ単語削除エラー:", e);
+    }
+  }, []);
+
   // 【サイドバースワイプ検出】
   const sidebarTouchStartRef = useRef<number>(0); // スワイプ開始位置
   const handleSidebarTouchStart = useCallback((e: React.TouchEvent) => {
@@ -191,10 +254,26 @@ export default function Home() {
     fetchWords();
   }, []);
 
+  // 【マイ単語のマージ】ログイン中のみ、マイ単語カテゴリとして一覧に統合する
+  const combinedWords = useMemo(() => {
+    const myWordItems = myWords.map((w) => ({
+      ...w,
+      isVisible: true,
+      category: MY_WORD_CATEGORY,
+      isMyWord: true,
+    }));
+    return [...allWords, ...myWordItems];
+  }, [allWords, myWords]);
+
+  const categories = useMemo(
+    () => (authUser && myWords.length > 0 ? [...CATEGORIES, MY_WORD_CATEGORY] : CATEGORIES),
+    [authUser, myWords.length]
+  );
+
   // 【フィルター】hiddenステータス以外・選択中カテゴリの単語のみを抽出（学習対象の単語リスト）
   const visibleWords = useMemo(
-    () => allWords.filter(w => w.isVisible && (selectedCategory === "すべて" || w.category === selectedCategory)),
-    [allWords, selectedCategory]
+    () => combinedWords.filter(w => w.isVisible && (selectedCategory === "すべて" || w.category === selectedCategory)),
+    [combinedWords, selectedCategory]
   );
 
   // 【カテゴリ切り替え】絞り込みが変わったら表示位置を先頭に戻す
@@ -360,12 +439,23 @@ export default function Home() {
       >
         <div className="w-[280px] h-full flex flex-col">
           {/* サイドバーヘッダー */}
-          <div className="mt-20 px-6 py-4 border-b border-slate-50">
+          <div className="mt-20 px-6 py-4 border-b border-slate-50 flex items-center justify-between gap-2">
             <h2 className="text-slate-400 text-xs font-black tracking-widest uppercase truncate">単語リスト</h2>
+            {authUser && (
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-blue-50 text-blue-500 text-[11px] font-black active:scale-95 transition-transform"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                単語を追加
+              </button>
+            )}
           </div>
           {/* カテゴリフィルター */}
           <div className="px-3 py-3 border-b border-slate-50 flex flex-wrap gap-1.5">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
@@ -380,7 +470,7 @@ export default function Home() {
             {visibleWords.map((w, idx) => (
               <div key={w.id} className={`flex items-center rounded-xl mb-1 border transition-all ${(word?.id === w.id) ? "bg-blue-50 border-blue-200" : "bg-transparent border-transparent"}`}>
                 {/* 単語ボタン：クリックで該当単語へジャンプ */}
-                <button onClick={() => { setCurrentIndex(idx); setIsFlipped(false); }} className="flex-1 text-left px-4 py-3 text-sm truncate font-bold text-slate-700 flex items-center gap-2">
+                <button onClick={() => { setCurrentIndex(idx); setIsFlipped(false); }} className="flex-1 text-left px-4 py-3 text-sm truncate font-bold text-slate-700 flex items-center gap-2 min-w-0">
                   <span className="opacity-30 font-mono text-xs">{idx + 1}</span>
                   <span className="flex-1 truncate">{w.word}</span>
                   {progressMap[w.id]?.learned && (
@@ -391,6 +481,17 @@ export default function Home() {
                     </span>
                   )}
                 </button>
+                {w.isMyWord && (
+                  <button
+                    onClick={() => handleDeleteMyWord(w.id)}
+                    className="flex-shrink-0 p-2 mr-1 text-slate-300 hover:text-red-400 transition-colors"
+                    title="削除"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                )}
               </div>
             ))}
           </nav>
@@ -639,6 +740,62 @@ export default function Home() {
           />
         </div>
       </main>
+
+      {/* 【単語追加モーダル】ログインユーザーがマイ単語を追加する */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={() => setIsAddModalOpen(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-slate-800 mb-4">マイ単語を追加</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 tracking-widest">単語</label>
+                <input
+                  type="text"
+                  value={newWordForm.word}
+                  onChange={(e) => setNewWordForm((prev) => ({ ...prev, word: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:border-blue-300"
+                  placeholder="例：VPC"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 tracking-widest">意味</label>
+                <input
+                  type="text"
+                  value={newWordForm.meaning}
+                  onChange={(e) => setNewWordForm((prev) => ({ ...prev, meaning: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:border-blue-300"
+                  placeholder="例：仮想プライベートネットワーク"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 tracking-widest">詳細（任意）</label>
+                <textarea
+                  value={newWordForm.description}
+                  onChange={(e) => setNewWordForm((prev) => ({ ...prev, description: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:border-blue-300 resize-none"
+                  rows={3}
+                  placeholder="補足説明があれば入力"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-black active:scale-95 transition-transform"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleAddMyWord}
+                disabled={isSavingWord || !newWordForm.word.trim() || !newWordForm.meaning.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform disabled:opacity-50"
+              >
+                {isSavingWord ? "保存中..." : "追加"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* グローバルスタイル */}
       <style jsx global>{`
