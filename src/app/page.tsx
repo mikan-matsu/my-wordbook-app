@@ -532,7 +532,7 @@ export default function Home() {
                   )}
 
                   {/* コンテンツエリア */}
-                  <div className="relative flex flex-col h-full px-8 md:px-20 py-16 pt-28">
+                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-28 pb-24">
                     {/* ヘッダー */}
                     <div className="relative text-center mb-6 flex-shrink-0 pointer-events-none">
                       <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
@@ -576,32 +576,33 @@ export default function Home() {
                       )}
                     </div>
                     
-                    {/* 進捗表示 */}
-                    <div className="relative mt-6 pointer-events-none">
-                      {/* PC版：テキストのみ */}
-                      <div className="hidden md:block text-center text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
-                        {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
-                      </div>
-                      {/* スマホ版：矢印付き */}
-                      <div className="md:hidden flex items-center justify-center gap-4 pointer-events-auto">
-                        <button onClick={handlePrev} className="w-11 h-11 flex items-center justify-center group">
-                          <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="15 18 9 12 15 6"></polyline>
-                            </svg>
-                          </span>
-                        </button>
-                        <span className="text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
-                          {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
+                  </div>
+
+                  {/* 進捗表示 */}
+                  <div className="absolute bottom-10 w-full pointer-events-none">
+                    {/* PC版：テキストのみ */}
+                    <div className="hidden md:block text-center text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
+                      {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
+                    </div>
+                    {/* スマホ版：矢印付き */}
+                    <div className="md:hidden flex items-center justify-center gap-4 pointer-events-auto">
+                      <button onClick={handlePrev} className="w-11 h-11 flex items-center justify-center group">
+                        <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                          </svg>
                         </span>
-                        <button onClick={handleNext} className="w-11 h-11 flex items-center justify-center group">
-                          <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="9 18 15 12 9 6"></polyline>
-                            </svg>
-                          </span>
-                        </button>
-                      </div>
+                      </button>
+                      <span className="text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
+                        {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
+                      </span>
+                      <button onClick={handleNext} className="w-11 h-11 flex items-center justify-center group">
+                        <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
