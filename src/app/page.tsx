@@ -344,7 +344,10 @@ export default function Home() {
                 </span>
                 <span className="hidden sm:inline">Googleでログイン</span>
               </button>
-              <span className="text-[10px] font-bold text-slate-400 max-w-[180px] text-right leading-tight select-none hidden sm:block">
+              <span
+                className="text-[10px] font-bold text-slate-400 max-w-[220px] text-right leading-tight select-none hidden sm:block"
+                style={{ wordBreak: "auto-phrase" } as React.CSSProperties}
+              >
                 ログインすると学習進捗を保存できます
               </span>
             </>
@@ -535,7 +538,7 @@ export default function Home() {
                       <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
                       <h2
                         className="font-black text-blue-600 leading-tight select-none text-balance"
-                        style={{ fontSize: word.meaning.length > 20 ? "clamp(1.25rem, 4.5vw, 2.5rem)" : "clamp(1.5rem, 6vw, 3rem)" }}
+                        style={{ fontSize: word.meaning.length > 20 ? "clamp(1.25rem, 4.5vw, 2.5rem)" : "clamp(1.5rem, 6vw, 3rem)", wordBreak: "auto-phrase" } as React.CSSProperties}
                       >
                         {word.meaning}
                       </h2>
