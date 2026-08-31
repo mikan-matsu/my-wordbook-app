@@ -483,7 +483,7 @@ export default function Home() {
                   <div className="absolute bottom-10 w-full pointer-events-none">
                     {/* PC版：テキストのみ */}
                     <div className="hidden md:block text-center text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
-                      {currentIndex + 1} {'/'} {visibleWords.length} | 表面
+                      {currentIndex + 1}{'/'}{visibleWords.length} 表
                     </div>
                     {/* スマホ版：矢印付き */}
                     <div className="md:hidden flex items-center justify-center gap-4 pointer-events-auto">
@@ -495,7 +495,7 @@ export default function Home() {
                         </span>
                       </button>
                       <span className="text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
-                        {currentIndex + 1} {'/'} {visibleWords.length} | 表面
+                        {currentIndex + 1}{'/'}{visibleWords.length} 表
                       </span>
                       <button onClick={handleNext} className="w-11 h-11 flex items-center justify-center group">
                         <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
@@ -579,7 +579,7 @@ export default function Home() {
                   <div className="absolute bottom-10 w-full pointer-events-none">
                     {/* PC版：テキストのみ */}
                     <div className="hidden md:block text-center text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
-                      {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
+                      {currentIndex + 1}{'/'}{visibleWords.length} 裏
                     </div>
                     {/* スマホ版：矢印付き */}
                     <div className="md:hidden flex items-center justify-center gap-4 pointer-events-auto">
@@ -591,7 +591,7 @@ export default function Home() {
                         </span>
                       </button>
                       <span className="text-slate-400 font-black text-[10px] tracking-widest opacity-80 select-none">
-                        {currentIndex + 1} {'/'} {visibleWords.length} | 裏面
+                        {currentIndex + 1}{'/'}{visibleWords.length} 裏
                       </span>
                       <button onClick={handleNext} className="w-11 h-11 flex items-center justify-center group">
                         <span className="inline-flex p-2 bg-white/80 backdrop-blur shadow-2xl rounded-full text-slate-600 opacity-85 group-hover:text-slate-700 group-hover:opacity-100 transition-all duration-300 transform group-hover:scale-110">
