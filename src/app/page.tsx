@@ -344,11 +344,8 @@ export default function Home() {
                 </span>
                 <span className="hidden sm:inline">Googleでログイン</span>
               </button>
-              <span
-                className="text-[10px] font-bold text-slate-400 max-w-[220px] text-right leading-tight select-none hidden sm:block"
-                style={{ wordBreak: "auto-phrase" } as React.CSSProperties}
-              >
-                ログインすると学習進捗を保存できます
+              <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap select-none hidden sm:block">
+                ログインで進捗保存
               </span>
             </>
           )
