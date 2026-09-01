@@ -1,13 +1,11 @@
 // 【クライアントコンポーネント】React Hooksを使用するため"use client"が必須
 "use client";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { Amplify } from "aws-amplify";
 import { generateClient } from "aws-amplify/data";
 import { getCurrentUser, signInWithRedirect, signOut } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 import type { Schema } from "../../amplify/data/resource";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import outputs from "../../amplify_outputs.json";
 
 // 【カード・アニメーション設定】前後の方向に応じてカードがスライドインして表示される
 const cardVariants: Variants = {
@@ -209,7 +207,6 @@ export default function Home() {
   useEffect(() => {
     const fetchWords = async () => {
       try {
-        Amplify.configure(outputs, { ssr: true });
         const client = generateClient<Schema>();
 
         // 【全件取得】nextTokenがある限りページングして全単語を取得する
@@ -563,7 +560,12 @@ export default function Home() {
 
                   {/* 中央に単語を表示 */}
                   <div className="flex-1 flex flex-col items-center justify-center px-12 text-center pointer-events-none">
-                    <h1 className="font-black text-slate-900 leading-none tracking-tighter select-none" style={{ fontSize: 'clamp(2rem, 8vw, 5rem)' }}>{word.word}</h1>
+                    <h1
+                      className="font-black text-slate-900 leading-none tracking-tighter select-none text-balance"
+                      style={{ fontSize: word.word.length > 10 ? "clamp(1.5rem, 6vw, 3.5rem)" : "clamp(2rem, 8vw, 5rem)", wordBreak: "auto-phrase" } as React.CSSProperties}
+                    >
+                      {word.word}
+                    </h1>
                   </div>
 
                   {/* 【覚えた/まだトグル】ログイン時のみ表示 */}
