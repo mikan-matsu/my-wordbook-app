@@ -617,10 +617,10 @@ export default function Home() {
       {/* 【メインエリア】カード表示と操作エリア */}
       <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-hidden transition-all duration-300">
         
-        {/* 【アプリタイトル】カード領域内で中央配置 */}
-        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 transform -translate-x-1/2 pointer-events-none">
-          <h1 className={`font-extrabold tracking-wide select-none flex items-center gap-3 text-blue-400 transition-all duration-300 whitespace-nowrap text-xl sm:text-2xl h-12 ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
-            AWS WordCard
+        {/* 【アプリタイトル】カード領域内で中央配置。左右固定要素（メニュー/ログイン）と重ならないよう幅を制限 */}
+        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[100px] sm:max-w-[220px] md:max-w-none" style={{ transform: "translateX(calc(-50% - 16px))" }}>
+          <h1 className={`font-extrabold tracking-wide select-none block text-blue-400 transition-all duration-300 truncate max-w-full text-base sm:text-2xl h-12 leading-[3rem] ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
+            <span className="hidden sm:inline">AWS </span>WordCard
           </h1>
           {/* 【絞り込み中カテゴリ表示】「すべて」以外を選択中のみ表示 */}
           {selectedCategory !== "すべて" && (
@@ -759,13 +759,13 @@ export default function Home() {
                   </div>
 
                   {/* コンテンツエリア */}
-                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-28 pb-24">
+                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-20 pb-16">
                     {/* ヘッダー */}
-                    <div className="relative text-center mb-6 flex-shrink-0 pointer-events-none">
+                    <div className="relative text-center mb-3 flex-shrink-0 pointer-events-none">
                       <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
                       <h2
                         className="font-black text-blue-600 leading-tight select-none text-balance"
-                        style={{ fontSize: word.meaning.length > 20 ? "clamp(1.25rem, 4.5vw, 2.5rem)" : "clamp(1.5rem, 6vw, 3rem)", wordBreak: "auto-phrase" } as React.CSSProperties}
+                        style={{ fontSize: word.meaning.length > 20 ? "clamp(1.1rem, 3.5vw, 1.875rem)" : "clamp(1.25rem, 4.5vw, 2.25rem)", wordBreak: "auto-phrase" } as React.CSSProperties}
                       >
                         {word.meaning}
                       </h2>
@@ -791,7 +791,7 @@ export default function Home() {
 
                     {/* スクロールエリア */}
                     <div 
-                      className="scrollable-bg relative flex-1 overflow-y-auto pr-2 custom-scrollbar border-t border-slate-50 pt-8 space-y-6 pointer-events-auto"
+                      className="scrollable-bg relative flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar border-t border-slate-50 pt-8 mb-4 space-y-6 pointer-events-auto"
                       style={{ zIndex: 1000, touchAction: "pan-y" }}
                     >
                       {/* 詳細説明 */}
