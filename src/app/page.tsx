@@ -41,11 +41,21 @@ export default function Home() {
   const [[page, direction], setPage] = useState([0, 0]); // ページ遷移の方向を記録（アニメーション用）
   const isTransitioning = useRef(false); // アニメーション実行中フラグ（重複アクション防止）
 
+  // 【開発用モックログイン】本番ビルドでは無効。?mockLogin=1 でバックエンド呼び出しなしにログイン済みUIを再現する
+  const isMockAuth = process.env.NODE_ENV !== "production" &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("mockLogin") === "1";
+
   // 【ログイン状態管理】
   const [authUser, setAuthUser] = useState<{ username: string; email?: string } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const checkCurrentUser = useCallback(async () => {
+    if (isMockAuth) {
+      setAuthUser({ username: "mock-user", email: "mock@example.com" });
+      setIsAuthLoading(false);
+      return;
+    }
     try {
       const user = await getCurrentUser();
       setAuthUser({ username: user.username, email: user.signInDetails?.loginId });
@@ -54,17 +64,18 @@ export default function Home() {
     } finally {
       setIsAuthLoading(false);
     }
-  }, []);
+  }, [isMockAuth]);
 
   useEffect(() => {
     checkCurrentUser();
+    if (isMockAuth) return;
     const unsubscribe = Hub.listen("auth", ({ payload }) => {
       if (payload.event === "signedIn" || payload.event === "signedOut") {
         checkCurrentUser();
       }
     });
     return unsubscribe;
-  }, [checkCurrentUser]);
+  }, [checkCurrentUser, isMockAuth]);
 
   const handleGoogleLogin = useCallback(() => {
     signInWithRedirect({ provider: "Google" });
@@ -74,15 +85,43 @@ export default function Home() {
     signOut();
   }, []);
 
-  // 【学習進捗管理】ログインユーザーの「覚えた」状態（wordId -> WordProgress）
+  // 【学習進捗管理】wordId -> 覚えたかどうか。未ログイン時はlocalStorage、ログイン時はDB(WordProgress)で管理する
+  const LOCAL_PROGRESS_KEY = "wordcard_local_progress";
   const [progressMap, setProgressMap] = useState<Record<string, { id: string; learned: boolean }>>({});
 
+  const loadLocalProgress = useCallback((): Record<string, boolean> => {
+    try {
+      const raw = window.localStorage.getItem(LOCAL_PROGRESS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const saveLocalProgress = useCallback((map: Record<string, boolean>) => {
+    try {
+      window.localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(map));
+    } catch (e) {
+      console.error("ローカル進捗保存エラー:", e);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!authUser) {
-      setProgressMap({});
+    if (isAuthLoading) return;
+
+    if (!authUser || isMockAuth) {
+      // 未ログイン、またはモックログイン中：localStorageから読み込む（バックエンド不要）
+      const local = loadLocalProgress();
+      const map: Record<string, { id: string; learned: boolean }> = {};
+      for (const [wordId, learned] of Object.entries(local)) {
+        map[wordId] = { id: wordId, learned };
+      }
+      setProgressMap(map);
       return;
     }
-    const fetchProgress = async () => {
+
+    // ログイン済み：DBから読み込み、localStorageに未同期の進捗があればマージする
+    const fetchAndMergeProgress = async () => {
       try {
         const client = generateClient<Schema>({ authMode: "userPool" });
         let items: any[] = [];
@@ -97,19 +136,53 @@ export default function Home() {
         for (const item of items) {
           map[item.wordId] = { id: item.id, learned: item.learned };
         }
+
+        // localStorageにDB未反映の進捗があればアップロードしてマージ
+        const local = loadLocalProgress();
+        const localEntries = Object.entries(local);
+        if (localEntries.length > 0) {
+          for (const [wordId, learned] of localEntries) {
+            if (!map[wordId]) {
+              const newId = `${wordId}_${authUser.username}`;
+              try {
+                await client.models.WordProgress.create({ id: newId, wordId, learned });
+                map[wordId] = { id: newId, learned };
+              } catch (e) {
+                console.error("進捗マージエラー:", e);
+              }
+            }
+          }
+          window.localStorage.removeItem(LOCAL_PROGRESS_KEY);
+        }
+
         setProgressMap(map);
       } catch (e) {
         console.error("進捗取得エラー:", e);
       }
     };
-    fetchProgress();
-  }, [authUser]);
+    fetchAndMergeProgress();
+  }, [authUser, isAuthLoading, isMockAuth, loadLocalProgress]);
 
   const handleToggleLearned = useCallback(async (wordId: string) => {
-    if (!authUser) return;
-    const client = generateClient<Schema>({ authMode: "userPool" });
     const existing = progressMap[wordId];
     const nextLearned = !existing?.learned;
+
+    if (isMockAuth) {
+      // モックログイン：バックエンドを呼ばずローカル状態のみ更新（デザイン確認用）
+      setProgressMap((prev) => ({ ...prev, [wordId]: { id: existing?.id || wordId, learned: nextLearned } }));
+      return;
+    }
+
+    if (!authUser) {
+      // 未ログイン：localStorageのみで完結
+      const local = loadLocalProgress();
+      local[wordId] = nextLearned;
+      saveLocalProgress(local);
+      setProgressMap((prev) => ({ ...prev, [wordId]: { id: wordId, learned: nextLearned } }));
+      return;
+    }
+
+    const client = generateClient<Schema>({ authMode: "userPool" });
     try {
       if (existing) {
         await client.models.WordProgress.update({ id: existing.id, wordId, learned: nextLearned });
@@ -122,7 +195,7 @@ export default function Home() {
     } catch (e) {
       console.error("進捗更新エラー:", e);
     }
-  }, [authUser, progressMap]);
+  }, [authUser, isMockAuth, progressMap, loadLocalProgress, saveLocalProgress]);
 
   // 【マイ単語管理】ログインユーザー本人が追加した単語
   const [myWords, setMyWords] = useState<any[]>([]);
@@ -131,7 +204,8 @@ export default function Home() {
   const [isSavingWord, setIsSavingWord] = useState(false);
 
   const fetchMyWords = useCallback(async () => {
-    if (!authUser) {
+    if (!authUser || isMockAuth) {
+      // 未ログイン、またはモックログイン中はマイ単語なし（バックエンド不要）
       setMyWords([]);
       return;
     }
@@ -149,7 +223,7 @@ export default function Home() {
     } catch (e) {
       console.error("マイ単語取得エラー:", e);
     }
-  }, [authUser]);
+  }, [authUser, isMockAuth]);
 
   useEffect(() => {
     fetchMyWords();
@@ -158,6 +232,21 @@ export default function Home() {
   const handleAddMyWord = useCallback(async () => {
     if (!authUser || !newWordForm.word.trim() || !newWordForm.meaning.trim()) return;
     setIsSavingWord(true);
+
+    if (isMockAuth) {
+      // モックログイン：ローカル配列に直接追加（デザイン確認用）
+      setMyWords((prev) => [...prev, {
+        id: `mock_${Date.now()}`,
+        word: newWordForm.word.trim(),
+        meaning: newWordForm.meaning.trim(),
+        description: newWordForm.description.trim() || undefined,
+      }]);
+      setNewWordForm({ word: "", meaning: "", description: "" });
+      setIsAddModalOpen(false);
+      setIsSavingWord(false);
+      return;
+    }
+
     try {
       const client = generateClient<Schema>({ authMode: "userPool" });
       await client.models.MyWord.create({
@@ -174,9 +263,13 @@ export default function Home() {
     } finally {
       setIsSavingWord(false);
     }
-  }, [authUser, newWordForm, fetchMyWords]);
+  }, [authUser, isMockAuth, newWordForm, fetchMyWords]);
 
   const handleDeleteMyWord = useCallback(async (id: string) => {
+    if (isMockAuth) {
+      setMyWords((prev) => prev.filter((w) => w.id !== id));
+      return;
+    }
     try {
       const client = generateClient<Schema>({ authMode: "userPool" });
       await client.models.MyWord.delete({ id });
@@ -184,7 +277,7 @@ export default function Home() {
     } catch (e) {
       console.error("マイ単語削除エラー:", e);
     }
-  }, []);
+  }, [isMockAuth]);
 
   // 【サイドバースワイプ検出】
   const sidebarTouchStartRef = useRef<number>(0); // スワイプ開始位置
@@ -267,17 +360,27 @@ export default function Home() {
     [authUser, myWords.length]
   );
 
-  // 【フィルター】hiddenステータス以外・選択中カテゴリの単語のみを抽出（学習対象の単語リスト）
+  // 【進捗フィルター】覚えた/まだで絞り込む
+  const [progressFilter, setProgressFilter] = useState<"all" | "learned" | "unlearned">("all");
+
+  // 【フィルター】hiddenステータス以外・選択中カテゴリ・進捗状態で絞り込み（学習対象の単語リスト）
   const visibleWords = useMemo(
-    () => combinedWords.filter(w => w.isVisible && (selectedCategory === "すべて" || w.category === selectedCategory)),
-    [combinedWords, selectedCategory]
+    () => combinedWords.filter(w => {
+      if (!w.isVisible) return false;
+      if (selectedCategory !== "すべて" && w.category !== selectedCategory) return false;
+      const learned = progressMap[w.id]?.learned === true;
+      if (progressFilter === "learned" && !learned) return false;
+      if (progressFilter === "unlearned" && learned) return false;
+      return true;
+    }),
+    [combinedWords, selectedCategory, progressFilter, progressMap]
   );
 
-  // 【カテゴリ切り替え】絞り込みが変わったら表示位置を先頭に戻す
+  // 【絞り込み切り替え】カテゴリ・進捗フィルターが変わったら表示位置を先頭に戻す
   useEffect(() => {
     setCurrentIndex(0);
     setIsFlipped(false);
-  }, [selectedCategory]);
+  }, [selectedCategory, progressFilter]);
 
   // 【次の単語へ移動】表面と裏面の切り替えと単語の進行を管理
   const handleNext = useCallback(() => {
@@ -421,7 +524,7 @@ export default function Home() {
                 <span className="hidden sm:inline">Googleでログイン</span>
               </button>
               <span className="text-[10px] font-medium text-slate-400 whitespace-nowrap select-none hidden sm:block pr-1">
-                ログインで進捗を保存
+                ログインで他の端末にも同期
               </span>
             </>
           )
@@ -459,6 +562,22 @@ export default function Home() {
                 className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? "bg-blue-400 text-white" : "bg-slate-100 text-slate-500"}`}
               >
                 {cat}
+              </button>
+            ))}
+          </div>
+          {/* 進捗フィルター */}
+          <div className="px-3 py-3 border-b border-slate-50 flex gap-1.5">
+            {([
+              { key: "all", label: "すべて" },
+              { key: "unlearned", label: "まだ" },
+              { key: "learned", label: "覚えた" },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setProgressFilter(key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${progressFilter === key ? "bg-emerald-400 text-white" : "bg-slate-100 text-slate-500"}`}
+              >
+                {label}
               </button>
             ))}
           </div>
@@ -568,20 +687,24 @@ export default function Home() {
                     </h1>
                   </div>
 
-                  {/* 【覚えた/まだトグル】ログイン時のみ表示 */}
-                  {authUser && (
-                    <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black shadow transition-all active:scale-95 ${progressMap[word.id]?.learned ? "bg-emerald-400 text-white" : "bg-slate-100 text-slate-500"}`}
-                      >
+                  {/* 【覚えた/まだトグル】未ログインでもlocalStorageで動作するため常時表示 */}
+                  <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black shadow transition-all active:scale-95 ${progressMap[word.id]?.learned ? "bg-emerald-400 text-white" : "bg-white text-slate-400 border border-slate-200"}`}
+                    >
+                      {progressMap[word.id]?.learned ? (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                        {progressMap[word.id]?.learned ? "覚えた" : "まだ"}
-                      </button>
-                    </div>
-                  )}
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="3 2.5">
+                          <circle cx="12" cy="12" r="8"></circle>
+                        </svg>
+                      )}
+                      {progressMap[word.id]?.learned ? "覚えた" : "まだ"}
+                    </button>
+                  </div>
                   {/* 進捗表示 */}
                   <div className="absolute bottom-10 w-full pointer-events-none">
                     {/* PC版：テキストのみ */}
@@ -616,20 +739,24 @@ export default function Home() {
                   {/* 背景番号 */}
                   <div className="absolute top-10 left-12 font-black text-6xl md:text-8xl italic text-slate-300 select-none">#{realNumber}</div>
 
-                  {/* 【覚えた/まだトグル】ログイン時のみ表示 */}
-                  {authUser && (
-                    <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black shadow transition-all active:scale-95 ${progressMap[word.id]?.learned ? "bg-emerald-400 text-white" : "bg-slate-100 text-slate-500"}`}
-                      >
+                  {/* 【覚えた/まだトグル】未ログインでもlocalStorageで動作するため常時表示 */}
+                  <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black shadow transition-all active:scale-95 ${progressMap[word.id]?.learned ? "bg-emerald-400 text-white" : "bg-white text-slate-400 border border-slate-200"}`}
+                    >
+                      {progressMap[word.id]?.learned ? (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                        {progressMap[word.id]?.learned ? "覚えた" : "まだ"}
-                      </button>
-                    </div>
-                  )}
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="3 2.5">
+                          <circle cx="12" cy="12" r="8"></circle>
+                        </svg>
+                      )}
+                      {progressMap[word.id]?.learned ? "覚えた" : "まだ"}
+                    </button>
+                  </div>
 
                   {/* コンテンツエリア */}
                   <div className="relative flex flex-col h-full px-8 md:px-20 pt-28 pb-24">
