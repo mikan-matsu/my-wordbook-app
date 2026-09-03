@@ -25,6 +25,12 @@ const cardVariants: Variants = {
 // 【カテゴリ一覧】"すべて"は絞り込み解除を表す特別値。マイ単語はログイン時のみ表示に追加する
 const CATEGORIES = ["すべて", "基本用語", "ネットワーク用語", "コンピューティング", "セキュリティ関連"];
 const MY_WORD_CATEGORY = "マイ単語";
+// 【カテゴリ表示ラベル】絞り込みの値(word.categoryと一致させる必要がある)はそのままに、ボタンの見た目だけ短縮する
+const CATEGORY_DISPLAY_LABELS: Record<string, string> = {
+  "基本用語": "基本",
+  "ネットワーク用語": "ネットワーク",
+  "セキュリティ関連": "セキュリティ",
+};
 
 // 【広告設定】未設定の場合はプレースホルダーを表示する
 const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
@@ -586,32 +592,38 @@ export default function Home() {
             )}
           </div>
           {/* カテゴリフィルター */}
-          <div className="px-3 py-3 border-b border-slate-50 flex flex-wrap gap-1.5">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? "bg-blue-400 text-white" : "bg-slate-100 text-slate-500"}`}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="px-3 py-3 border-b border-slate-50">
+            <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-300 tracking-widest select-none">カテゴリ</span>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? "bg-blue-400 text-white" : "bg-slate-100 text-slate-500"}`}
+                >
+                  {CATEGORY_DISPLAY_LABELS[cat] ?? cat}
+                </button>
+              ))}
+            </div>
           </div>
           {/* 進捗フィルター */}
-          <div className="px-3 py-3 border-b border-slate-50 flex gap-1.5">
-            {([
-              { key: "all", label: "すべて" },
-              { key: "unlearned", label: "まだ" },
-              { key: "learned", label: "覚えた" },
-            ] as const).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setProgressFilter(key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${progressFilter === key ? "bg-emerald-400 text-white" : "bg-slate-100 text-slate-500"}`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="px-3 py-3 border-b border-slate-50">
+            <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-300 tracking-widest select-none">進捗</span>
+            <div className="flex gap-1.5">
+              {([
+                { key: "all", label: "すべて" },
+                { key: "unlearned", label: "まだ" },
+                { key: "learned", label: "覚えた" },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setProgressFilter(key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${progressFilter === key ? "bg-emerald-400 text-white" : "bg-slate-100 text-slate-500"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           {/* 単語一覧のスクロール領域 */}
           <nav className="flex-1 overflow-y-auto p-3 custom-scrollbar">
@@ -657,7 +669,7 @@ export default function Home() {
           {/* 【絞り込み中カテゴリ表示】「すべて」以外を選択中のみ表示 */}
           {selectedCategory !== "すべて" && (
             <span className="mt-1 px-3 py-1 rounded-full bg-blue-100 text-blue-500 text-[10px] font-black tracking-widest select-none whitespace-nowrap">
-              {selectedCategory}
+              {CATEGORY_DISPLAY_LABELS[selectedCategory] ?? selectedCategory}
             </span>
           )}
         </div>
