@@ -618,7 +618,7 @@ export default function Home() {
       <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-hidden transition-all duration-300">
         
         {/* 【アプリタイトル】カード領域内で中央配置。左右固定要素（メニュー/ログイン）と重ならないよう幅を制限 */}
-        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[100px] sm:max-w-[220px] md:max-w-none" style={{ transform: "translateX(calc(-50% - 16px))" }}>
+        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[100px] sm:max-w-[300px] md:max-w-none translate-x-[calc(-50%-16px)] sm:translate-x-[calc(-50%-90px)]">
           <h1 className={`font-extrabold tracking-wide select-none block text-blue-400 transition-all duration-300 truncate max-w-full text-base sm:text-2xl h-12 leading-[3rem] ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
             <span className="hidden sm:inline">AWS </span>WordCard
           </h1>
@@ -690,6 +690,7 @@ export default function Home() {
                   {/* 【覚えた/まだトグル】未ログインでもlocalStorageで動作するため常時表示 */}
                   <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
                     <button
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black shadow transition-all active:scale-95 ${progressMap[word.id]?.learned ? "bg-emerald-400 text-white" : "bg-white text-slate-400 border border-slate-200"}`}
                     >
@@ -742,6 +743,7 @@ export default function Home() {
                   {/* 【覚えた/まだトグル】未ログインでもlocalStorageで動作するため常時表示 */}
                   <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
                     <button
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}
                       className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-black shadow transition-all active:scale-95 ${progressMap[word.id]?.learned ? "bg-emerald-400 text-white" : "bg-white text-slate-400 border border-slate-200"}`}
                     >
@@ -759,7 +761,7 @@ export default function Home() {
                   </div>
 
                   {/* コンテンツエリア */}
-                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-20 pb-16">
+                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-32 pb-16">
                     {/* ヘッダー */}
                     <div className="relative text-center mb-3 flex-shrink-0 pointer-events-none">
                       <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
