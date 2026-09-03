@@ -39,6 +39,44 @@ const ADSENSE_SLOT_ID = process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID;
 // 【使い方説明】localStorageにこのキーがなければ初回訪問とみなして自動表示する
 const ONBOARDING_SEEN_KEY = "wordcard_onboarding_seen";
 
+// 【使い方説明の内容】実際の画面キャプチャで「このボタンを押すとどうなるか」を見せるステップ形式
+const ONBOARDING_STEPS: {
+  title: string;
+  description: string;
+  images: { src: string; alt: string; caption?: string }[];
+}[] = [
+  {
+    title: "カードをめくって意味を確認",
+    description: "単語カードをタップ（クリック）すると裏返り、意味と詳細が表示されます。",
+    images: [
+      { src: "/onboarding/step1-front.png", alt: "カード表面", caption: "タップ前" },
+      { src: "/onboarding/step1-back.png", alt: "カード裏面", caption: "タップ後" },
+    ],
+  },
+  {
+    title: "覚えたら右上のボタンをタップ",
+    description: "「まだ」ボタンを押すと「覚えた」に切り替わり、進捗として記録されます。もう一度押すと元に戻せます。",
+    images: [
+      { src: "/onboarding/step2-before.png", alt: "まだボタン", caption: "押す前" },
+      { src: "/onboarding/step2-after.png", alt: "覚えたボタン", caption: "押した後" },
+    ],
+  },
+  {
+    title: "サイドバーで絞り込む",
+    description: "左上のメニューから、カテゴリや「覚えた/まだ」の進捗で単語を絞り込めます。",
+    images: [
+      { src: "/onboarding/step3-sidebar.png", alt: "カテゴリ・進捗フィルター" },
+    ],
+  },
+  {
+    title: "ログインで他の端末にも同期",
+    description: "右上からGoogleでログインすると、学習の進捗や単語帳がどの端末からでも同じ状態で使えます。",
+    images: [
+      { src: "/onboarding/step4-login.png", alt: "Googleでログインボタン" },
+    ],
+  },
+];
+
 export default function Home() {
   // 【状態管理】
   const [allWords, setAllWords] = useState<any[]>([]); // すべての単語データ
@@ -47,6 +85,7 @@ export default function Home() {
   const [isFlipped, setIsFlipped] = useState(false); // カード表示状態（表面:false/裏面:true）
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバーの開閉状態
   const [showOnboarding, setShowOnboarding] = useState(false); // 使い方説明オーバーレイの表示状態
+  const [onboardingStep, setOnboardingStep] = useState(0); // 使い方説明の現在ページ（0始まり）
 
   // 【初回訪問チェック】localStorageに表示済みフラグがなければ自動表示する
   useEffect(() => {
@@ -59,6 +98,11 @@ export default function Home() {
       // localStorageが使えない環境では何もしない
     }
   }, []);
+
+  // 【ページリセット】オーバーレイを開くたびに1ページ目から表示する
+  useEffect(() => {
+    if (showOnboarding) setOnboardingStep(0);
+  }, [showOnboarding]);
 
   const handleCloseOnboarding = useCallback(() => {
     setShowOnboarding(false);
@@ -937,30 +981,74 @@ export default function Home() {
       </main>
 
       {/* 【単語追加モーダル】ログインユーザーがマイ単語を追加する */}
-      {/* 【使い方説明】初回訪問時に自動表示、以降は左上の「?」ボタンから再表示できる */}
-      {showOnboarding && (
-        <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={handleCloseOnboarding}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-black text-slate-800 mb-4">使い方</h3>
-            <div className="space-y-4">
-              <div className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-500 text-xs font-black flex items-center justify-center">1</span>
-                <p className="text-sm font-bold text-slate-600 leading-relaxed">サイドバーの<span className="text-blue-500">カテゴリ</span>や<span className="text-blue-500">覚えた/まだ</span>で単語を絞り込めます。</p>
+      {/* 【使い方説明】初回訪問時に自動表示、以降は左上の「?」ボタンから再表示できる。実際の画面キャプチャ付きの複数ページ構成 */}
+      {showOnboarding && (() => {
+        const step = ONBOARDING_STEPS[onboardingStep];
+        const isFirst = onboardingStep === 0;
+        const isLast = onboardingStep === ONBOARDING_STEPS.length - 1;
+        return (
+          <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={handleCloseOnboarding}>
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              {/* ヘッダー：タイトルとページ番号 */}
+              <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
+                <h3 className="text-lg font-black text-slate-800">使い方</h3>
+                <span className="text-xs font-bold text-slate-400">{onboardingStep + 1} / {ONBOARDING_STEPS.length}</span>
               </div>
-              <div className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-500 text-xs font-black flex items-center justify-center">2</span>
-                <p className="text-sm font-bold text-slate-600 leading-relaxed">ログインすると、学習の進捗や単語帳が他の端末にも同期されます。</p>
+
+              {/* スクロール可能なコンテンツ領域 */}
+              <div className="overflow-y-auto px-6 py-2 custom-scrollbar">
+                <div className="flex gap-3 mb-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-500 text-xs font-black flex items-center justify-center">{onboardingStep + 1}</span>
+                  <p className="text-sm font-black text-slate-800 leading-relaxed pt-0.5">{step.title}</p>
+                </div>
+
+                {/* キャプチャ画像：1枚ならそのまま、2枚なら「押す前/押した後」を並べる */}
+                <div className={`grid gap-2 mb-3 ${step.images.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                  {step.images.map((img) => (
+                    <div key={img.src} className="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 使い方説明用の小さな静的キャプチャ画像のためnext/imageの最適化は不要 */}
+                      <img src={img.src} alt={img.alt} className="w-full h-auto block" />
+                      {img.caption && (
+                        <div className="text-center text-[10px] font-bold text-slate-400 py-1 border-t border-slate-100">{img.caption}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-sm font-bold text-slate-600 leading-relaxed pb-2">{step.description}</p>
+              </div>
+
+              {/* フッター：ページ位置ドットと戻る/次へ */}
+              <div className="flex-shrink-0 px-6 pb-6 pt-3">
+                <div className="flex items-center justify-center gap-1.5 mb-4">
+                  {ONBOARDING_STEPS.map((_, idx) => (
+                    <span
+                      key={idx}
+                      className={`h-1.5 rounded-full transition-all ${idx === onboardingStep ? "w-5 bg-blue-400" : "w-1.5 bg-slate-200"}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  {!isFirst && (
+                    <button
+                      onClick={() => setOnboardingStep((s) => s - 1)}
+                      className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-sm font-black active:scale-95 transition-transform"
+                    >
+                      戻る
+                    </button>
+                  )}
+                  <button
+                    onClick={isLast ? handleCloseOnboarding : () => setOnboardingStep((s) => s + 1)}
+                    className="flex-1 py-2.5 rounded-xl bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform"
+                  >
+                    {isLast ? "閉じる" : "次へ"}
+                  </button>
+                </div>
               </div>
             </div>
-            <button
-              onClick={handleCloseOnboarding}
-              className="w-full mt-6 py-2.5 rounded-xl bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform"
-            >
-              閉じる
-            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={() => setIsAddModalOpen(false)}>
