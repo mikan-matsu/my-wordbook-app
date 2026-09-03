@@ -956,7 +956,7 @@ export default function Home() {
               onClick={handleCloseOnboarding}
               className="w-full mt-6 py-2.5 rounded-xl bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform"
             >
-              わかった
+              閉じる
             </button>
           </div>
         </div>
