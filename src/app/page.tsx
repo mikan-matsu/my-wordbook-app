@@ -514,9 +514,8 @@ export default function Home() {
     </div>
   );
   // 現在表示する単語を決定（表示用インデックス優先、フォールバック用）
+  // 絞り込み結果が0件の場合はundefinedになりうる（例: 「覚えた」で絞り込んだが1件も覚えていない場合）
   const word = visibleWords[currentIndex] || visibleWords[0];
-  // 単語データが存在しない場合は表示しない
-  if (!word) return null;
 
   // 【表示番号の計算】選択中カテゴリの絞り込みリストでの位置を表示
   const realNumber = currentIndex + 1;
@@ -682,6 +681,19 @@ export default function Home() {
         
         {/* 【カード表示エリア】フリップアニメーション付きカード */}
         <div className="relative w-full max-w-5xl flex-1 min-h-[420px] z-[100]">
+          {!word ? (
+            // 【絞り込み結果0件】例えば「覚えた」で絞り込んだが1件も覚えていない場合。フィルターを戻せるよう案内する
+            <div className="w-full h-full flex flex-col items-center justify-center text-center px-6 shadow-[0_40px_80px_rgba(0,0,0,0.08)] rounded-[3rem] bg-white">
+              <p className="text-slate-500 font-bold mb-4">この絞り込み条件に該当する単語がありません。</p>
+              <button
+                onClick={() => { setSelectedCategory("すべて"); setProgressFilter("all"); }}
+                className="px-5 py-2.5 rounded-full bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform"
+              >
+                絞り込みを解除する
+              </button>
+            </div>
+          ) : (
+          <>
           {/* AnimatePresence：カード遷移時のアニメーション制御 */}
           <AnimatePresence initial={false} custom={direction} mode="popLayout">
             {/* カード：cardVariantsの定義に従ってスライドアニメーション + スワイプ対応 */}
@@ -888,6 +900,8 @@ export default function Home() {
               </div>
             </motion.div>
           </AnimatePresence>
+          </>
+          )}
         </div>
 
         {/* 広告スペース：AdSense未設定時はプレースホルダーを表示 */}
