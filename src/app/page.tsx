@@ -2,7 +2,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { generateClient } from "aws-amplify/data";
-import { getCurrentUser, signInWithRedirect, signOut } from "aws-amplify/auth";
+import { fetchUserAttributes, getCurrentUser, signInWithRedirect, signOut } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 import type { Schema } from "../../amplify/data/resource";
 import { motion, AnimatePresence, Variants } from "framer-motion";
@@ -89,7 +89,13 @@ export default function Home() {
     }
     try {
       const user = await getCurrentUser();
-      setAuthUser({ username: user.username, email: user.signInDetails?.loginId });
+      let email = user.signInDetails?.loginId;
+      if (!email) {
+        // Google連携ログインではsignInDetailsが取れないため、属性から直接メールアドレスを取得する
+        const attributes = await fetchUserAttributes();
+        email = attributes.email;
+      }
+      setAuthUser({ username: user.username, email });
     } catch {
       setAuthUser(null);
     } finally {
