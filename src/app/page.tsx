@@ -30,6 +30,9 @@ const MY_WORD_CATEGORY = "マイ単語";
 const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 const ADSENSE_SLOT_ID = process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID;
 
+// 【使い方説明】localStorageにこのキーがなければ初回訪問とみなして自動表示する
+const ONBOARDING_SEEN_KEY = "wordcard_onboarding_seen";
+
 export default function Home() {
   // 【状態管理】
   const [allWords, setAllWords] = useState<any[]>([]); // すべての単語データ
@@ -37,6 +40,28 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0); // 現在表示中の単語のインデックス
   const [isFlipped, setIsFlipped] = useState(false); // カード表示状態（表面:false/裏面:true）
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバーの開閉状態
+  const [showOnboarding, setShowOnboarding] = useState(false); // 使い方説明オーバーレイの表示状態
+
+  // 【初回訪問チェック】localStorageに表示済みフラグがなければ自動表示する
+  useEffect(() => {
+    try {
+      if (!window.localStorage.getItem(ONBOARDING_SEEN_KEY)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 初回マウント時にlocalStorageを読むための同期setStateで、他の初期化処理と同じパターン
+        setShowOnboarding(true);
+      }
+    } catch {
+      // localStorageが使えない環境では何もしない
+    }
+  }, []);
+
+  const handleCloseOnboarding = useCallback(() => {
+    setShowOnboarding(false);
+    try {
+      window.localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
+    } catch {
+      // localStorageが使えない環境では何もしない
+    }
+  }, []);
   const [selectedCategory, setSelectedCategory] = useState<string>("すべて"); // 選択中のカテゴリ
   const [[page, direction], setPage] = useState([0, 0]); // ページ遷移の方向を記録（アニメーション用）
   const isTransitioning = useRef(false); // アニメーション実行中フラグ（重複アクション防止）
@@ -500,6 +525,13 @@ export default function Home() {
         </button>
       </div>
 
+      {/* 【使い方説明ボタン】ハンバーガーの下に配置し、押すと使い方オーバーレイを再表示する */}
+      <div className="fixed top-24 left-4 z-[700]">
+        <button onClick={() => setShowOnboarding(true)} className="w-10 h-10 flex items-center justify-center bg-white shadow-xl rounded-2xl text-slate-500 font-black text-sm active:scale-95 transition-transform">
+          ?
+        </button>
+      </div>
+
       {/* 【ログインボタン】未ログイン時はGoogleログイン、ログイン時はメールアドレスとログアウトボタンを表示 */}
       <div className="fixed top-8 right-6 z-[700] flex flex-col items-center gap-1">
         {!isAuthLoading && (
@@ -539,7 +571,7 @@ export default function Home() {
       >
         <div className="w-[280px] h-full flex flex-col">
           {/* サイドバーヘッダー */}
-          <div className="mt-20 px-6 py-4 border-b border-slate-50 flex items-center justify-between gap-2">
+          <div className="mt-36 px-6 py-4 border-b border-slate-50 flex items-center justify-between gap-2">
             <h2 className="text-slate-400 text-xs font-black tracking-widest uppercase truncate">単語リスト</h2>
             {authUser && (
               <button
@@ -615,7 +647,7 @@ export default function Home() {
       </aside>
 
       {/* 【メインエリア】カード表示と操作エリア */}
-      <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-hidden transition-all duration-300">
+      <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-y-auto overflow-x-hidden transition-all duration-300">
         
         {/* 【アプリタイトル】カード領域内で中央配置。左右固定要素（メニュー/ログイン）と重ならないよう幅を制限 */}
         <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[100px] sm:max-w-[300px] md:max-w-none translate-x-[calc(-50%-16px)] sm:translate-x-[calc(-50%-90px)]">
@@ -631,7 +663,7 @@ export default function Home() {
         </div>
         
         {/* 【カード表示エリア】フリップアニメーション付きカード */}
-        <div className="relative w-full max-w-5xl flex-1 min-h-0 z-[100]">
+        <div className="relative w-full max-w-5xl flex-1 min-h-[420px] z-[100]">
           {/* AnimatePresence：カード遷移時のアニメーション制御 */}
           <AnimatePresence initial={false} custom={direction} mode="popLayout">
             {/* カード：cardVariantsの定義に従ってスライドアニメーション + スワイプ対応 */}
@@ -873,6 +905,31 @@ export default function Home() {
       </main>
 
       {/* 【単語追加モーダル】ログインユーザーがマイ単語を追加する */}
+      {/* 【使い方説明】初回訪問時に自動表示、以降は左上の「?」ボタンから再表示できる */}
+      {showOnboarding && (
+        <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={handleCloseOnboarding}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-slate-800 mb-4">使い方</h3>
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-500 text-xs font-black flex items-center justify-center">1</span>
+                <p className="text-sm font-bold text-slate-600 leading-relaxed">サイドバーの<span className="text-blue-500">カテゴリ</span>や<span className="text-blue-500">覚えた/まだ</span>で単語を絞り込めます。</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-500 text-xs font-black flex items-center justify-center">2</span>
+                <p className="text-sm font-bold text-slate-600 leading-relaxed">ログインすると、学習の進捗や単語帳が他の端末にも同期されます。</p>
+              </div>
+            </div>
+            <button
+              onClick={handleCloseOnboarding}
+              className="w-full mt-6 py-2.5 rounded-xl bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform"
+            >
+              わかった
+            </button>
+          </div>
+        </div>
+      )}
+
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={() => setIsAddModalOpen(false)}>
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
