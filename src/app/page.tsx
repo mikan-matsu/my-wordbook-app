@@ -805,7 +805,7 @@ export default function Home() {
                   </div>
 
                   {/* コンテンツエリア */}
-                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-32 pb-16">
+                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-40 pb-16">
                     {/* ヘッダー */}
                     <div className="relative text-center mb-3 flex-shrink-0 pointer-events-none">
                       <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
