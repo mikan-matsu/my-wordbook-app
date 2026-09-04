@@ -1040,7 +1040,10 @@ export default function Home() {
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  {!isFirst && (
+                  {isFirst ? (
+                    // 1ページ目は「戻る」がないが、「次へ」の位置・大きさが2ページ目以降とずれないよう場所だけ確保する
+                    <div className="flex-1" aria-hidden="true" />
+                  ) : (
                     <button
                       onClick={() => setOnboardingStep((s) => s - 1)}
                       className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-sm font-black active:scale-95 transition-transform"
