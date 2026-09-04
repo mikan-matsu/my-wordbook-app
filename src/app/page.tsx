@@ -63,7 +63,7 @@ const ONBOARDING_STEPS: {
   },
   {
     title: "サイドバーで絞り込む",
-    description: "左上のメニューから、カテゴリや「覚えた/まだ」の進捗で単語を絞り込めます。",
+    description: "画面左上のメニューから、カテゴリや「覚えた/まだ」の進捗で単語を絞り込めます。",
     images: [
       { src: "/onboarding/step3-sidebar.png", alt: "カテゴリ・進捗フィルター" },
     ],
