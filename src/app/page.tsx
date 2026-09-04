@@ -988,15 +988,26 @@ export default function Home() {
         const isLast = onboardingStep === ONBOARDING_STEPS.length - 1;
         return (
           <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={handleCloseOnboarding}>
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              {/* ヘッダー：タイトルとページ番号 */}
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md h-[600px] max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              {/* ヘッダー：タイトル・ページ番号・閉じるボタン（常時表示、ページによってサイズが変わらないよう固定高さ） */}
               <div className="flex items-center justify-between px-6 pt-6 pb-2 flex-shrink-0">
                 <h3 className="text-lg font-black text-slate-800">使い方</h3>
-                <span className="text-xs font-bold text-slate-400">{onboardingStep + 1} / {ONBOARDING_STEPS.length}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-400">{onboardingStep + 1} / {ONBOARDING_STEPS.length}</span>
+                  <button
+                    onClick={handleCloseOnboarding}
+                    aria-label="閉じる"
+                    className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 active:scale-95 transition-transform"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              {/* スクロール可能なコンテンツ領域 */}
-              <div className="overflow-y-auto px-6 py-2 custom-scrollbar">
+              {/* スクロール可能なコンテンツ領域：ページごとに文章量・画像枚数が違うため、ここだけがスクロールしダイアログ全体のサイズは変わらない */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-2 custom-scrollbar">
                 <div className="flex gap-3 mb-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-500 text-xs font-black flex items-center justify-center">{onboardingStep + 1}</span>
                   <p className="text-sm font-black text-slate-800 leading-relaxed pt-0.5">{step.title}</p>
@@ -1018,13 +1029,13 @@ export default function Home() {
                 <p className="text-sm font-bold text-slate-600 leading-relaxed pb-2">{step.description}</p>
               </div>
 
-              {/* フッター：ページ位置ドットと戻る/次へ */}
+              {/* フッター：ページ位置ドットと戻る/次へ（常に同じ高さ） */}
               <div className="flex-shrink-0 px-6 pb-6 pt-3">
                 <div className="flex items-center justify-center gap-1.5 mb-4">
                   {ONBOARDING_STEPS.map((_, idx) => (
                     <span
                       key={idx}
-                      className={`h-1.5 rounded-full transition-all ${idx === onboardingStep ? "w-5 bg-blue-400" : "w-1.5 bg-slate-200"}`}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === onboardingStep ? "bg-blue-400" : "bg-slate-200"}`}
                     />
                   ))}
                 </div>
@@ -1032,7 +1043,7 @@ export default function Home() {
                   {!isFirst && (
                     <button
                       onClick={() => setOnboardingStep((s) => s - 1)}
-                      className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-sm font-black active:scale-95 transition-transform"
+                      className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-500 text-sm font-black active:scale-95 transition-transform"
                     >
                       戻る
                     </button>
