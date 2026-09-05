@@ -651,14 +651,6 @@ export default function Home() {
         </button>
       </div>
 
-      {/* 【開発用モック状態表示】develop環境・ローカル開発でのみ表示。実際のGoogle認証を経由していないことを示す非操作の状態ラベル。
-          ログイン/ログアウトの切り替えは通常の「Googleでログイン」「ログアウト」ボタンがdevelop環境・ローカル開発ではモックで動作する */}
-      {isMockAuthAllowedHost && (
-        <span className="fixed top-24 left-4 z-[700] px-2 py-1 rounded-lg bg-slate-800/40 text-white text-[9px] font-bold shadow pointer-events-none select-none">
-          MOCK: {mockLoginToggle ? "ログイン中" : "未ログイン"}
-        </span>
-      )}
-
       {/* 【ログイン中ポップオーバーの背景】アバター以外の場所をクリック/タップすると閉じる */}
       {showEmailPopover && (
         <div className="fixed inset-0 z-[690]" onClick={() => setShowEmailPopover(false)} />
@@ -723,10 +715,9 @@ export default function Home() {
         onTouchEnd={handleSidebarTouchEnd}
       >
         <div className="w-[280px] h-full flex flex-col">
-          {/* サイドバーヘッダー */}
-          <div className="mt-24 px-6 py-4 border-b border-slate-50 flex items-center justify-between gap-2">
-            <h2 className="text-slate-400 text-xs font-black tracking-widest uppercase truncate">単語リスト</h2>
-            {authUser && (
+          {/* サイドバーヘッダー：見出しラベルは意味を持たないため廃止し、ログイン中のみ単語追加ボタンを表示してスペースを詰める */}
+          {authUser && (
+            <div className="mt-24 px-6 py-4 border-b border-slate-50 flex items-center justify-end gap-2">
               <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-blue-50 text-blue-500 text-[11px] font-black active:scale-95 transition-transform"
@@ -736,11 +727,11 @@ export default function Home() {
                 </svg>
                 単語を追加
               </button>
-            )}
-          </div>
+            </div>
+          )}
           {/* カテゴリフィルター */}
-          <div className="px-3 py-3 border-b border-slate-50">
-            <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-300 tracking-widest select-none">カテゴリ</span>
+          <div className={`px-3 py-3 border-b border-slate-50 ${!authUser ? "mt-24" : ""}`}>
+            <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-500 tracking-widest select-none">カテゴリ</span>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((cat) => (
                 <button
@@ -761,7 +752,7 @@ export default function Home() {
           </div>
           {/* 進捗フィルター */}
           <div className="px-3 py-3 border-b border-slate-50">
-            <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-300 tracking-widest select-none">進捗</span>
+            <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-500 tracking-widest select-none">進捗</span>
             <div className="flex gap-1.5">
               {([
                 { key: "all", label: "すべて" },
