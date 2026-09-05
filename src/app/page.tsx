@@ -128,9 +128,10 @@ export default function Home() {
   const [[page, direction], setPage] = useState([0, 0]); // ページ遷移の方向を記録（アニメーション用）
   const isTransitioning = useRef(false); // アニメーション実行中フラグ（重複アクション防止）
 
-  // 【開発用モックログイン】本番ビルドでは無効。?mockLogin=1 でバックエンド呼び出しなしにログイン済みUIを再現する
-  const isMockAuth = process.env.NODE_ENV !== "production" &&
-    typeof window !== "undefined" &&
+  // 【開発用モックログイン】本番ビルドではdevelopホストのみ有効（mainでは常に無効）。?mockLogin=1 でバックエンド呼び出しなしにログイン済みUIを再現する
+  const isMockAuthAllowedHost = typeof window !== "undefined" &&
+    (process.env.NODE_ENV !== "production" || window.location.hostname.startsWith("develop."));
+  const isMockAuth = isMockAuthAllowedHost &&
     new URLSearchParams(window.location.search).get("mockLogin") === "1";
 
   // 【ログイン状態管理】
@@ -590,18 +591,23 @@ export default function Home() {
         <div className="fixed inset-0 bg-slate-900/40 z-[450] md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* 【メニューボタン】ハンバーガーメニューと使い方説明ボタンを横並びに配置：z-indexを[700]に設定して最前面に配置 */}
+      {/* 【メニューボタン】ハンバーガーメニューと使い方説明ボタン（md以上のみ）を横並びに配置：z-indexを[700]に設定して最前面に配置 */}
       <div className="fixed top-8 left-4 z-[700] flex items-center gap-3">
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-3 bg-white shadow-xl rounded-2xl text-slate-600 active:scale-95 transition-transform">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
-        {/* 【使い方説明ボタン】押すと使い方オーバーレイを再表示する */}
-        <button onClick={() => setShowOnboarding(true)} className="w-10 h-10 flex items-center justify-center bg-white shadow-xl rounded-2xl text-slate-500 font-black text-sm active:scale-95 transition-transform">
+        {/* 【使い方説明ボタン(md以上)】画面が広くタイトルと重ならないためここに表示。カード送り矢印はmd以上でのみ表示されるため、狭幅側の固定ボタンとは棲み分ける */}
+        <button onClick={() => setShowOnboarding(true)} className="hidden md:flex w-10 h-10 items-center justify-center bg-white shadow-xl rounded-2xl text-slate-500 font-black text-sm active:scale-95 transition-transform">
           ?
         </button>
       </div>
+
+      {/* 【使い方説明ボタン(md未満)】狭幅端末ではタイトルと重なるためヘッダーから外し右側中央に固定配置。この幅ではカード送り矢印は非表示のため衝突しない */}
+      <button onClick={() => setShowOnboarding(true)} className="md:hidden fixed top-1/2 -translate-y-1/2 right-4 z-[700] w-12 h-12 flex items-center justify-center bg-white shadow-xl rounded-full text-slate-500 font-black text-base active:scale-95 transition-transform">
+        ?
+      </button>
 
       {/* 【ログイン中ポップオーバーの背景】アバター以外の場所をクリック/タップすると閉じる */}
       {showEmailPopover && (
@@ -641,7 +647,7 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <button onClick={handleGoogleLogin} className="flex items-center gap-2 bg-[#4285F4] hover:bg-[#3367d6] shadow-xl rounded-full pl-1.5 pr-4 py-1.5 text-white text-sm font-bold active:scale-95 transition-all">
+              <button onClick={handleGoogleLogin} className="flex items-center gap-2 bg-[#4285F4] hover:bg-[#3367d6] shadow-xl rounded-full pl-1.5 pr-1.5 sm:pr-4 py-1.5 text-white text-sm font-bold active:scale-95 transition-all">
                 <span className="bg-white rounded-full p-1.5 flex items-center justify-center flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
