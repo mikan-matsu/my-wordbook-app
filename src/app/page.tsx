@@ -196,16 +196,18 @@ export default function Home() {
 
   const handleLogout = useCallback(() => {
     setShowEmailPopover(false);
-    if (isMockAuthAllowedHost) {
-      // authUserを即座にクリアしないと、切替直後の1レンダーだけ「authUserはモックユーザーのまま・isMockAuthはfalse」という
-      // 不整合な状態が生じ、モックユーザーのまま本物のDB取得処理が走ってNoValidAuthTokensエラーになるため同時にリセットする
+    if (isMockAuth) {
+      // 「今まさにモックログイン中」の場合のみローカル状態だけ戻す。
+      // isMockAuthAllowedHost(develop等のホストかどうか)だけで判定すると、実際にGoogleでログイン済みの
+      // セッションでログアウトを押した際に本物のsignOut()が呼ばれず、セッションが残ったままUIだけ
+      // 宙ぶらりんになる不具合があったため、実際にモック中かどうかで判定するよう修正
       setAuthUser(null);
       setIsAuthLoading(true);
       setMockLoginToggle(false);
       return;
     }
     signOut();
-  }, [isMockAuthAllowedHost]);
+  }, [isMockAuth]);
 
   // 【学習進捗管理】wordId -> 覚えたか/マイカテゴリ登録済みか。未ログイン時はlocalStorage、ログイン時はDB(WordProgress)で管理する
   const LOCAL_PROGRESS_KEY = "wordcard_local_progress";
@@ -649,6 +651,19 @@ export default function Home() {
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
+        {/* 【単語を追加ボタン】サイドバーが開いている間のみハンバーガー横に表示。狭幅端末でもこの間タイトルはサイドバーの下に
+            隠れるため重ならず、サイドバーが閉じている(=タイトルが見えている)時は表示しないことで衝突を避ける */}
+        {isSidebarOpen && authUser && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-white shadow-xl text-blue-500 text-[11px] font-black active:scale-95 transition-transform"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            単語を追加
+          </button>
+        )}
       </div>
 
       {/* 【ログイン中ポップオーバーの背景】アバター以外の場所をクリック/タップすると閉じる */}
@@ -715,22 +730,8 @@ export default function Home() {
         onTouchEnd={handleSidebarTouchEnd}
       >
         <div className="w-[280px] h-full flex flex-col">
-          {/* サイドバーヘッダー：見出しラベルは意味を持たないため廃止し、ログイン中のみ単語追加ボタンを表示してスペースを詰める */}
-          {authUser && (
-            <div className="mt-24 px-6 py-4 border-b border-slate-50 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-blue-50 text-blue-500 text-[11px] font-black active:scale-95 transition-transform"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                単語を追加
-              </button>
-            </div>
-          )}
           {/* カテゴリフィルター */}
-          <div className={`px-3 py-3 border-b border-slate-50 ${!authUser ? "mt-24" : ""}`}>
+          <div className="mt-20 px-3 py-3 border-b border-slate-50">
             <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-500 tracking-widest select-none">カテゴリ</span>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((cat) => (
