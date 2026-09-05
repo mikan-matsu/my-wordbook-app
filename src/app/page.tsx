@@ -590,17 +590,14 @@ export default function Home() {
         <div className="fixed inset-0 bg-slate-900/40 z-[450] md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* 【メニューボタン】ハンバーガーメニュー：z-indexを[700]に設定して最前面に配置 */}
-      <div className="fixed top-8 left-4 z-[700]">
+      {/* 【メニューボタン】ハンバーガーメニューと使い方説明ボタンを横並びに配置：z-indexを[700]に設定して最前面に配置 */}
+      <div className="fixed top-8 left-4 z-[700] flex items-center gap-3">
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-3 bg-white shadow-xl rounded-2xl text-slate-600 active:scale-95 transition-transform">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
-      </div>
-
-      {/* 【使い方説明ボタン】ハンバーガーの下に配置し、押すと使い方オーバーレイを再表示する */}
-      <div className="fixed top-24 left-4 z-[700]">
+        {/* 【使い方説明ボタン】押すと使い方オーバーレイを再表示する */}
         <button onClick={() => setShowOnboarding(true)} className="w-10 h-10 flex items-center justify-center bg-white shadow-xl rounded-2xl text-slate-500 font-black text-sm active:scale-95 transition-transform">
           ?
         </button>
@@ -671,7 +668,7 @@ export default function Home() {
       >
         <div className="w-[280px] h-full flex flex-col">
           {/* サイドバーヘッダー */}
-          <div className="mt-36 px-6 py-4 border-b border-slate-50 flex items-center justify-between gap-2">
+          <div className="mt-24 px-6 py-4 border-b border-slate-50 flex items-center justify-between gap-2">
             <h2 className="text-slate-400 text-xs font-black tracking-widest uppercase truncate">単語リスト</h2>
             {authUser && (
               <button
