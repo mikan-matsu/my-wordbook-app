@@ -84,6 +84,18 @@ export default function Home() {
   const [currentIndex, setCurrentIndex] = useState(0); // 現在表示中の単語のインデックス
   const [isFlipped, setIsFlipped] = useState(false); // カード表示状態（表面:false/裏面:true）
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバーの開閉状態
+
+  // 【単語リストのスクロールヒント】上下にまだ続きがあるかを判定し、フェードグラデーションの表示に使う
+  const wordListRef = useRef<HTMLElement>(null);
+  const [wordListScroll, setWordListScroll] = useState({ canScrollUp: false, canScrollDown: false });
+  const updateWordListScrollState = useCallback(() => {
+    const el = wordListRef.current;
+    if (!el) return;
+    setWordListScroll({
+      canScrollUp: el.scrollTop > 4,
+      canScrollDown: el.scrollTop + el.clientHeight < el.scrollHeight - 4,
+    });
+  }, []);
   const [showOnboarding, setShowOnboarding] = useState(false); // 使い方説明オーバーレイの表示状態
   const [onboardingStep, setOnboardingStep] = useState(0); // 使い方説明の現在ページ（0始まり）
 
@@ -459,6 +471,11 @@ export default function Home() {
     [combinedWords, selectedCategory, progressFilter, progressMap]
   );
 
+  // 【単語リストのスクロールヒント再計算】絞り込みでリストの件数(=高さ)が変わるたびに判定し直す
+  useEffect(() => {
+    updateWordListScrollState();
+  }, [visibleWords, updateWordListScrollState]);
+
   // 【絞り込み切り替え】カテゴリ・進捗フィルターが変わったら表示位置を先頭に戻す
   useEffect(() => {
     setCurrentIndex(0);
@@ -702,8 +719,13 @@ export default function Home() {
               ))}
             </div>
           </div>
-          {/* 単語一覧のスクロール領域 */}
-          <nav className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+          {/* 単語一覧のスクロール領域：上下にまだ続きがある時だけフェードグラデーションを重ねて、スクロールできることを示す */}
+          <div className="relative flex-1 min-h-0">
+            <nav
+              ref={wordListRef}
+              onScroll={updateWordListScrollState}
+              className="h-full overflow-y-auto p-3 custom-scrollbar"
+            >
             {visibleWords.map((w, idx) => (
               <div key={w.id} className={`flex items-center rounded-xl mb-1 border transition-all ${(word?.id === w.id) ? "bg-blue-50 border-blue-200" : "bg-transparent border-transparent"}`}>
                 {/* 単語ボタン：クリックで該当単語へジャンプ */}
@@ -731,7 +753,14 @@ export default function Home() {
                 )}
               </div>
             ))}
-          </nav>
+            </nav>
+            {wordListScroll.canScrollUp && (
+              <div className="pointer-events-none absolute top-0 inset-x-0 h-6 bg-gradient-to-b from-white to-transparent shadow-[inset_0_8px_6px_-6px_rgba(15,23,42,0.15)]" />
+            )}
+            {wordListScroll.canScrollDown && (
+              <div className="pointer-events-none absolute bottom-0 inset-x-0 h-6 bg-gradient-to-t from-white to-transparent shadow-[inset_0_-8px_6px_-6px_rgba(15,23,42,0.15)]" />
+            )}
+          </div>
         </div>
       </aside>
 
