@@ -731,7 +731,7 @@ export default function Home() {
       >
         <div className="w-[280px] h-full flex flex-col">
           {/* カテゴリフィルター */}
-          <div className="mt-20 px-3 py-3 border-b border-slate-50">
+          <div className="mt-20 px-3 py-3 border-b border-slate-300">
             <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-500 tracking-widest select-none">カテゴリ</span>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((cat) => (
