@@ -131,8 +131,11 @@ export default function Home() {
   // 【開発用モックログイン】本番ビルドではdevelopホストのみ有効（mainでは常に無効）。?mockLogin=1 でバックエンド呼び出しなしにログイン済みUIを再現する
   const isMockAuthAllowedHost = typeof window !== "undefined" &&
     (process.env.NODE_ENV !== "production" || window.location.hostname.startsWith("develop."));
-  const isMockAuth = isMockAuthAllowedHost &&
-    new URLSearchParams(window.location.search).get("mockLogin") === "1";
+  // 初期値はURLの?mockLogin=1から。以降は画面右上のトグルボタンでURLを書き換えずに切り替えられる
+  const [mockLoginToggle, setMockLoginToggle] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mockLogin") === "1"
+  );
+  const isMockAuth = isMockAuthAllowedHost && mockLoginToggle;
 
   // 【ログイン状態管理】
   const [authUser, setAuthUser] = useState<{ username: string; email?: string } | null>(null);
@@ -591,23 +594,25 @@ export default function Home() {
         <div className="fixed inset-0 bg-slate-900/40 z-[450] md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* 【メニューボタン】ハンバーガーメニューと使い方説明ボタン（md以上のみ）を横並びに配置：z-indexを[700]に設定して最前面に配置 */}
+      {/* 【メニューボタン】ハンバーガーメニュー。z-indexを[700]に設定して最前面に配置 */}
       <div className="fixed top-8 left-4 z-[700] flex items-center gap-3">
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-3 bg-white shadow-xl rounded-2xl text-slate-600 active:scale-95 transition-transform">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
-        {/* 【使い方説明ボタン(md以上)】画面が広くタイトルと重ならないためここに表示。カード送り矢印はmd以上でのみ表示されるため、狭幅側の固定ボタンとは棲み分ける */}
-        <button onClick={() => setShowOnboarding(true)} className="hidden md:flex w-10 h-10 items-center justify-center bg-white shadow-xl rounded-2xl text-slate-500 font-black text-sm active:scale-95 transition-transform">
-          ?
-        </button>
       </div>
 
-      {/* 【使い方説明ボタン(md未満)】狭幅端末ではタイトルと重なるためヘッダーから外し右側中央に固定配置。この幅ではカード送り矢印は非表示のため衝突しない */}
-      <button onClick={() => setShowOnboarding(true)} className="md:hidden fixed top-1/2 -translate-y-1/2 right-4 z-[700] w-12 h-12 flex items-center justify-center bg-white shadow-xl rounded-full text-slate-500 font-black text-base active:scale-95 transition-transform">
-        ?
-      </button>
+      {/* 【開発用モックログイン切替】develop環境・ローカル開発でのみ表示。自動テストで実際のGoogleログインを経由せずログイン状態を切り替えるための開発者向けボタン。
+          左下はNext.jsの開発オーバーレイ(issueバッジ)と重なるためtop-24に配置 */}
+      {isMockAuthAllowedHost && (
+        <button
+          onClick={() => setMockLoginToggle((v) => !v)}
+          className="fixed top-24 left-4 z-[700] px-3 py-2 rounded-xl bg-amber-400 text-white text-[10px] font-black shadow-xl active:scale-95 transition-transform"
+        >
+          MOCK: {mockLoginToggle ? "ログイン中" : "未ログイン"}
+        </button>
+      )}
 
       {/* 【ログイン中ポップオーバーの背景】アバター以外の場所をクリック/タップすると閉じる */}
       {showEmailPopover && (
@@ -1018,6 +1023,10 @@ export default function Home() {
           </AnimatePresence>
           </>
           )}
+          {/* 【使い方説明ボタン】カード右下角に固定。押すと使い方オーバーレイを再表示する */}
+          <button onClick={() => setShowOnboarding(true)} className="absolute bottom-6 right-6 z-[150] w-11 h-11 flex items-center justify-center bg-white shadow-xl rounded-full text-slate-500 font-black text-base active:scale-95 transition-transform">
+            ?
+          </button>
         </div>
 
         {/* 広告スペース：AdSense未設定時はプレースホルダーを表示 */}
