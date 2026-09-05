@@ -25,6 +25,8 @@ const cardVariants: Variants = {
 // 【カテゴリ一覧】"すべて"は絞り込み解除を表す特別値。マイ単語はログイン時のみ表示に追加する
 const CATEGORIES = ["すべて", "基本用語", "ネットワーク用語", "コンピューティング", "セキュリティ関連"];
 const MY_WORD_CATEGORY = "マイ単語";
+// 【マイカテゴリ】既存の単語の中から自分で選んで登録する専用リスト。word.categoryではなくprogressMap[wordId].inMyCategoryで判定する特別なカテゴリ値
+const MY_CATEGORY = "マイカテゴリ";
 // 【カテゴリ表示ラベル】絞り込みの値(word.categoryと一致させる必要がある)はそのままに、ボタンの見た目だけ短縮する
 const CATEGORY_DISPLAY_LABELS: Record<string, string> = {
   "基本用語": "基本",
@@ -59,6 +61,14 @@ const ONBOARDING_STEPS: {
     images: [
       { src: "/onboarding/step2-before.png", alt: "まだボタン", caption: "押す前" },
       { src: "/onboarding/step2-after.png", alt: "覚えたボタン", caption: "押した後" },
+    ],
+  },
+  {
+    title: "好きな単語を「マイカテゴリ」に登録",
+    description: "ログイン中は、しおりマークのボタンを押すとその単語だけを集めた「マイカテゴリ」に登録されます。サイドバーの「マイカテゴリ」を選ぶと、登録した単語だけで学習できます。",
+    images: [
+      { src: "/onboarding/step5-before.png", alt: "マイカテゴリ登録前", caption: "押す前" },
+      { src: "/onboarding/step5-after.png", alt: "マイカテゴリ登録後", caption: "押した後" },
     ],
   },
   {
@@ -176,28 +186,49 @@ export default function Home() {
   }, [checkCurrentUser, isMockAuth]);
 
   const handleGoogleLogin = useCallback(() => {
+    if (isMockAuthAllowedHost) {
+      // develop環境・ローカル開発では実際のGoogle認証を経由せず、ボタン操作だけでログイン済みUIを再現する
+      setMockLoginToggle(true);
+      return;
+    }
     signInWithRedirect({ provider: "Google" });
-  }, []);
+  }, [isMockAuthAllowedHost]);
 
   const handleLogout = useCallback(() => {
     setShowEmailPopover(false);
+    if (isMockAuthAllowedHost) {
+      // authUserを即座にクリアしないと、切替直後の1レンダーだけ「authUserはモックユーザーのまま・isMockAuthはfalse」という
+      // 不整合な状態が生じ、モックユーザーのまま本物のDB取得処理が走ってNoValidAuthTokensエラーになるため同時にリセットする
+      setAuthUser(null);
+      setIsAuthLoading(true);
+      setMockLoginToggle(false);
+      return;
+    }
     signOut();
-  }, []);
+  }, [isMockAuthAllowedHost]);
 
-  // 【学習進捗管理】wordId -> 覚えたかどうか。未ログイン時はlocalStorage、ログイン時はDB(WordProgress)で管理する
+  // 【学習進捗管理】wordId -> 覚えたか/マイカテゴリ登録済みか。未ログイン時はlocalStorage、ログイン時はDB(WordProgress)で管理する
   const LOCAL_PROGRESS_KEY = "wordcard_local_progress";
-  const [progressMap, setProgressMap] = useState<Record<string, { id: string; learned: boolean }>>({});
+  type LocalProgressEntry = { learned: boolean; inMyCategory?: boolean };
+  const [progressMap, setProgressMap] = useState<Record<string, { id: string; learned: boolean; inMyCategory: boolean }>>({});
 
-  const loadLocalProgress = useCallback((): Record<string, boolean> => {
+  const loadLocalProgress = useCallback((): Record<string, LocalProgressEntry> => {
     try {
       const raw = window.localStorage.getItem(LOCAL_PROGRESS_KEY);
-      return raw ? JSON.parse(raw) : {};
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      // 旧形式(wordId -> boolean)との互換性を保つ
+      const migrated: Record<string, LocalProgressEntry> = {};
+      for (const [wordId, value] of Object.entries<any>(parsed)) {
+        migrated[wordId] = typeof value === "boolean" ? { learned: value } : value;
+      }
+      return migrated;
     } catch {
       return {};
     }
   }, []);
 
-  const saveLocalProgress = useCallback((map: Record<string, boolean>) => {
+  const saveLocalProgress = useCallback((map: Record<string, LocalProgressEntry>) => {
     try {
       window.localStorage.setItem(LOCAL_PROGRESS_KEY, JSON.stringify(map));
     } catch (e) {
@@ -211,9 +242,9 @@ export default function Home() {
     if (!authUser || isMockAuth) {
       // 未ログイン、またはモックログイン中：localStorageから読み込む（バックエンド不要）
       const local = loadLocalProgress();
-      const map: Record<string, { id: string; learned: boolean }> = {};
-      for (const [wordId, learned] of Object.entries(local)) {
-        map[wordId] = { id: wordId, learned };
+      const map: Record<string, { id: string; learned: boolean; inMyCategory: boolean }> = {};
+      for (const [wordId, entry] of Object.entries(local)) {
+        map[wordId] = { id: wordId, learned: entry.learned, inMyCategory: entry.inMyCategory === true };
       }
       setProgressMap(map);
       return;
@@ -231,21 +262,21 @@ export default function Home() {
           items = items.concat(result.data || []);
           cursor = result.nextToken;
         } while (cursor);
-        const map: Record<string, { id: string; learned: boolean }> = {};
+        const map: Record<string, { id: string; learned: boolean; inMyCategory: boolean }> = {};
         for (const item of items) {
-          map[item.wordId] = { id: item.id, learned: item.learned };
+          map[item.wordId] = { id: item.id, learned: item.learned, inMyCategory: item.inMyCategory === true };
         }
 
         // localStorageにDB未反映の進捗があればアップロードしてマージ
         const local = loadLocalProgress();
         const localEntries = Object.entries(local);
         if (localEntries.length > 0) {
-          for (const [wordId, learned] of localEntries) {
+          for (const [wordId, entry] of localEntries) {
             if (!map[wordId]) {
               const newId = `${wordId}_${authUser.username}`;
               try {
-                await client.models.WordProgress.create({ id: newId, wordId, learned });
-                map[wordId] = { id: newId, learned };
+                await client.models.WordProgress.create({ id: newId, wordId, learned: entry.learned, inMyCategory: entry.inMyCategory === true });
+                map[wordId] = { id: newId, learned: entry.learned, inMyCategory: entry.inMyCategory === true };
               } catch (e) {
                 console.error("進捗マージエラー:", e);
               }
@@ -262,39 +293,51 @@ export default function Home() {
     fetchAndMergeProgress();
   }, [authUser, isAuthLoading, isMockAuth, loadLocalProgress]);
 
-  const handleToggleLearned = useCallback(async (wordId: string) => {
+  // 【進捗の1フィールド更新】覚えた/まだ・マイカテゴリ共通の更新処理。片方のフィールドだけを変更し、もう片方は保持する
+  const updateProgressField = useCallback(async (wordId: string, field: "learned" | "inMyCategory", nextValue: boolean) => {
     const existing = progressMap[wordId];
-    const nextLearned = !existing?.learned;
+    const nextEntry = {
+      learned: field === "learned" ? nextValue : (existing?.learned ?? false),
+      inMyCategory: field === "inMyCategory" ? nextValue : (existing?.inMyCategory ?? false),
+    };
 
     if (isMockAuth) {
       // モックログイン：バックエンドを呼ばずローカル状態のみ更新（デザイン確認用）
-      setProgressMap((prev) => ({ ...prev, [wordId]: { id: existing?.id || wordId, learned: nextLearned } }));
+      setProgressMap((prev) => ({ ...prev, [wordId]: { id: existing?.id || wordId, ...nextEntry } }));
       return;
     }
 
     if (!authUser) {
       // 未ログイン：localStorageのみで完結
       const local = loadLocalProgress();
-      local[wordId] = nextLearned;
+      local[wordId] = nextEntry;
       saveLocalProgress(local);
-      setProgressMap((prev) => ({ ...prev, [wordId]: { id: wordId, learned: nextLearned } }));
+      setProgressMap((prev) => ({ ...prev, [wordId]: { id: wordId, ...nextEntry } }));
       return;
     }
 
     const client = generateClient<Schema>({ authMode: "userPool" });
     try {
       if (existing) {
-        await client.models.WordProgress.update({ id: existing.id, wordId, learned: nextLearned });
-        setProgressMap((prev) => ({ ...prev, [wordId]: { id: existing.id, learned: nextLearned } }));
+        await client.models.WordProgress.update({ id: existing.id, wordId, ...nextEntry });
+        setProgressMap((prev) => ({ ...prev, [wordId]: { id: existing.id, ...nextEntry } }));
       } else {
         const newId = `${wordId}_${authUser.username}`;
-        await client.models.WordProgress.create({ id: newId, wordId, learned: nextLearned });
-        setProgressMap((prev) => ({ ...prev, [wordId]: { id: newId, learned: nextLearned } }));
+        await client.models.WordProgress.create({ id: newId, wordId, ...nextEntry });
+        setProgressMap((prev) => ({ ...prev, [wordId]: { id: newId, ...nextEntry } }));
       }
     } catch (e) {
       console.error("進捗更新エラー:", e);
     }
   }, [authUser, isMockAuth, progressMap, loadLocalProgress, saveLocalProgress]);
+
+  const handleToggleLearned = useCallback((wordId: string) => {
+    updateProgressField(wordId, "learned", !progressMap[wordId]?.learned);
+  }, [progressMap, updateProgressField]);
+
+  const handleToggleMyCategory = useCallback((wordId: string) => {
+    updateProgressField(wordId, "inMyCategory", !progressMap[wordId]?.inMyCategory);
+  }, [progressMap, updateProgressField]);
 
   // 【マイ単語管理】ログインユーザー本人が追加した単語
   const [myWords, setMyWords] = useState<any[]>([]);
@@ -454,10 +497,11 @@ export default function Home() {
     return [...allWords, ...myWordItems];
   }, [allWords, myWords]);
 
-  const categories = useMemo(
-    () => (authUser && myWords.length > 0 ? [...CATEGORIES, MY_WORD_CATEGORY] : CATEGORIES),
-    [authUser, myWords.length]
-  );
+  const categories = useMemo(() => {
+    // マイカテゴリはログイン中のみ表示する機能
+    const base = authUser ? [...CATEGORIES, MY_CATEGORY] : CATEGORIES;
+    return authUser && myWords.length > 0 ? [...base, MY_WORD_CATEGORY] : base;
+  }, [authUser, myWords.length]);
 
   // 【進捗フィルター】覚えた/まだで絞り込む
   const [progressFilter, setProgressFilter] = useState<"all" | "learned" | "unlearned">("all");
@@ -466,7 +510,11 @@ export default function Home() {
   const visibleWords = useMemo(
     () => combinedWords.filter(w => {
       if (!w.isVisible) return false;
-      if (selectedCategory !== "すべて" && w.category !== selectedCategory) return false;
+      if (selectedCategory === MY_CATEGORY) {
+        if (progressMap[w.id]?.inMyCategory !== true) return false;
+      } else if (selectedCategory !== "すべて" && w.category !== selectedCategory) {
+        return false;
+      }
       const learned = progressMap[w.id]?.learned === true;
       if (progressFilter === "learned" && !learned) return false;
       if (progressFilter === "unlearned" && learned) return false;
@@ -603,15 +651,12 @@ export default function Home() {
         </button>
       </div>
 
-      {/* 【開発用モックログイン切替】develop環境・ローカル開発でのみ表示。自動テストで実際のGoogleログインを経由せずログイン状態を切り替えるための開発者向けボタン。
-          左下はNext.jsの開発オーバーレイ(issueバッジ)と重なるためtop-24に配置 */}
+      {/* 【開発用モック状態表示】develop環境・ローカル開発でのみ表示。実際のGoogle認証を経由していないことを示す非操作の状態ラベル。
+          ログイン/ログアウトの切り替えは通常の「Googleでログイン」「ログアウト」ボタンがdevelop環境・ローカル開発ではモックで動作する */}
       {isMockAuthAllowedHost && (
-        <button
-          onClick={() => setMockLoginToggle((v) => !v)}
-          className="fixed top-24 left-4 z-[700] px-3 py-2 rounded-xl bg-amber-400 text-white text-[10px] font-black shadow-xl active:scale-95 transition-transform"
-        >
+        <span className="fixed top-24 left-4 z-[700] px-2 py-1 rounded-lg bg-slate-800/40 text-white text-[9px] font-bold shadow pointer-events-none select-none">
           MOCK: {mockLoginToggle ? "ログイン中" : "未ログイン"}
-        </button>
+        </span>
       )}
 
       {/* 【ログイン中ポップオーバーの背景】アバター以外の場所をクリック/タップすると閉じる */}
@@ -701,8 +746,14 @@ export default function Home() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? "bg-blue-400 text-white" : "bg-slate-100 text-slate-500"}`}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedCategory === cat ? "bg-blue-400 text-white" : "bg-slate-100 text-slate-500"}`}
                 >
+                  {cat === MY_CATEGORY && (
+                    // カード上のしおりボタンと同じアイコンにして、マイカテゴリの中身がしおりで登録した単語だと直感的にわかるようにする
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                  )}
                   {CATEGORY_DISPLAY_LABELS[cat] ?? cat}
                 </button>
               ))}
@@ -785,7 +836,7 @@ export default function Home() {
       </aside>
 
       {/* 【メインエリア】カード表示と操作エリア */}
-      <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-y-auto overflow-x-hidden transition-all duration-300">
+      <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-32 overflow-y-auto overflow-x-hidden transition-all duration-300">
         
         {/* 【アプリタイトル】カードと完全に中心を揃える（ビューポート中央固定）。左右のヘッダー要素は幅が変動しても重ならないよう幅を制限する */}
         <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[130px] sm:max-w-[220px] md:max-w-none -translate-x-1/2">
@@ -794,7 +845,7 @@ export default function Home() {
           </h1>
           {/* 【絞り込み中カテゴリ表示】「すべて」以外を選択中のみ表示 */}
           {selectedCategory !== "すべて" && (
-            <span className="mt-1 px-3 py-1 rounded-full bg-blue-100 text-blue-500 text-[10px] font-black tracking-widest select-none whitespace-nowrap">
+            <span className="mt-2 px-3 py-1 rounded-full bg-blue-100 text-blue-500 text-[10px] font-black tracking-widest select-none whitespace-nowrap">
               {CATEGORY_DISPLAY_LABELS[selectedCategory] ?? selectedCategory}
             </span>
           )}
@@ -840,7 +891,7 @@ export default function Home() {
                 {/* カード表面 */}
                 <div className="absolute inset-0 backface-hidden flex flex-col rounded-[3rem] bg-white" style={{ backfaceVisibility: "hidden" }}>
                   {/* 背景番号 */}
-                  <div className="absolute top-10 left-12 font-black text-6xl md:text-8xl italic text-slate-300 select-none pointer-events-none">#{realNumber}</div>
+                  <div className="absolute top-6 left-6 font-black text-4xl md:text-6xl italic text-slate-300 select-none pointer-events-none">#{realNumber}</div>
                   
                   {/* 左右判定レイヤー */}
                   <div className="absolute inset-0 flex">
@@ -870,8 +921,21 @@ export default function Home() {
                     </h1>
                   </div>
 
-                  {/* 【覚えた/まだトグル】未ログインでもlocalStorageで動作するため常時表示 */}
-                  <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
+                  {/* 【覚えた/まだ・マイカテゴリ登録トグル】覚えた/まだは未ログインでもlocalStorageで動作するため常時表示。マイカテゴリ登録はログイン中のみ表示する機能 */}
+                  <div className="absolute top-6 right-8 z-[300] pointer-events-auto flex items-center gap-2">
+                    {authUser && (
+                      <button
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); handleToggleMyCategory(word.id); }}
+                        title="マイカテゴリに登録"
+                        aria-label="マイカテゴリに登録"
+                        className={`w-9 h-9 flex items-center justify-center rounded-full shadow transition-all active:scale-95 ${progressMap[word.id]?.inMyCategory ? "bg-amber-400 text-white" : "bg-white text-slate-400 border border-slate-200"}`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={progressMap[word.id]?.inMyCategory ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                      </button>
+                    )}
                     <button
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}
@@ -921,10 +985,23 @@ export default function Home() {
                 {/* カード裏面 */}
                 <div className="absolute inset-0 flex flex-col rounded-[3rem] bg-white overflow-hidden shadow-inner" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
                   {/* 背景番号 */}
-                  <div className="absolute top-10 left-12 font-black text-6xl md:text-8xl italic text-slate-300 select-none">#{realNumber}</div>
+                  <div className="absolute top-6 left-6 font-black text-4xl md:text-6xl italic text-slate-300 select-none">#{realNumber}</div>
 
-                  {/* 【覚えた/まだトグル】未ログインでもlocalStorageで動作するため常時表示 */}
-                  <div className="absolute top-10 right-12 z-[300] pointer-events-auto">
+                  {/* 【覚えた/まだ・マイカテゴリ登録トグル】覚えた/まだは未ログインでもlocalStorageで動作するため常時表示。マイカテゴリ登録はログイン中のみ表示する機能 */}
+                  <div className="absolute top-6 right-8 z-[300] pointer-events-auto flex items-center gap-2">
+                    {authUser && (
+                      <button
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); handleToggleMyCategory(word.id); }}
+                        title="マイカテゴリに登録"
+                        aria-label="マイカテゴリに登録"
+                        className={`w-9 h-9 flex items-center justify-center rounded-full shadow transition-all active:scale-95 ${progressMap[word.id]?.inMyCategory ? "bg-amber-400 text-white" : "bg-white text-slate-400 border border-slate-200"}`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={progressMap[word.id]?.inMyCategory ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                      </button>
+                    )}
                     <button
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); handleToggleLearned(word.id); }}

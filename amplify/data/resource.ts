@@ -18,12 +18,13 @@ const schema = a.schema({
     .secondaryIndexes((index) => [index('status').name('byStatus').queryField('wordsByStatus')])
     .authorization((allow) => [allow.publicApiKey()]),
 
-  // ログインユーザー本人の学習進捗（覚えた/まだ）。個人情報は持たず、Cognitoのsubのみをキーにする。
+  // ログインユーザー本人の学習進捗（覚えた/まだ、マイカテゴリ登録）。個人情報は持たず、Cognitoのsubのみをキーにする。
   WordProgress: a
     .model({
       id: a.id().required(),
       wordId: a.string().required(),
       learned: a.boolean().required(),
+      inMyCategory: a.boolean(),
     })
     .identifier(['id'])
     .authorization((allow) => [allow.owner()]),
