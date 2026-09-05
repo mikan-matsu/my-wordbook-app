@@ -755,10 +755,10 @@ export default function Home() {
             ))}
             </nav>
             {wordListScroll.canScrollUp && (
-              <div className="pointer-events-none absolute top-0 inset-x-0 h-6 bg-gradient-to-b from-white to-transparent shadow-[inset_0_8px_6px_-6px_rgba(15,23,42,0.15)]" />
+              <div className="pointer-events-none absolute top-0 inset-x-0 h-8 bg-gradient-to-b from-amber-100 to-transparent" />
             )}
             {wordListScroll.canScrollDown && (
-              <div className="pointer-events-none absolute bottom-0 inset-x-0 h-6 bg-gradient-to-t from-white to-transparent shadow-[inset_0_-8px_6px_-6px_rgba(15,23,42,0.15)]" />
+              <div className="pointer-events-none absolute bottom-0 inset-x-0 h-8 bg-gradient-to-t from-amber-100 to-transparent" />
             )}
           </div>
         </div>
