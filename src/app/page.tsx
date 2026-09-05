@@ -600,13 +600,13 @@ export default function Home() {
       <div className="fixed top-8 right-6 z-[700] flex flex-col items-center gap-1">
         {!isAuthLoading && (
           authUser ? (
-            <div className="flex items-center gap-2 bg-white shadow-xl rounded-2xl px-2 py-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-white shadow-xl rounded-2xl px-1.5 sm:px-2 py-1.5 sm:py-2">
               <div className="relative">
                 <button
                   onClick={() => setShowEmailPopover((v) => !v)}
                   title={authUser.email || authUser.username}
                   aria-label="ログイン中のアカウント"
-                  className="w-8 h-8 rounded-full bg-blue-400 text-white text-sm font-black flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+                  className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-blue-400 text-white text-[10px] sm:text-sm font-black flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
                 >
                   {(authUser.email || authUser.username || "?").charAt(0).toUpperCase()}
                 </button>
@@ -616,8 +616,8 @@ export default function Home() {
                   </div>
                 )}
               </div>
-              <button onClick={handleLogout} aria-label="ログアウト" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-black active:scale-95 transition-transform">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+              <button onClick={handleLogout} aria-label="ログアウト" className="flex items-center gap-1 px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-black active:scale-95 transition-transform">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 sm:w-[14px] sm:h-[14px]">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                   <polyline points="16 17 21 12 16 7"></polyline>
                   <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -739,8 +739,8 @@ export default function Home() {
       <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-y-auto overflow-x-hidden transition-all duration-300">
         
         {/* 【アプリタイトル】カードと完全に中心を揃える（ビューポート中央固定）。左右のヘッダー要素は幅が変動しても重ならないよう幅を制限する */}
-        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[100px] sm:max-w-[220px] md:max-w-none -translate-x-1/2">
-          <h1 className={`font-extrabold tracking-wide select-none block text-blue-400 transition-all duration-300 truncate max-w-full text-base sm:text-2xl h-12 leading-[3rem] ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
+        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[130px] sm:max-w-[220px] md:max-w-none -translate-x-1/2">
+          <h1 className={`font-extrabold tracking-wide select-none block text-blue-400 transition-all duration-300 truncate max-w-full text-lg sm:text-2xl h-12 leading-[3rem] ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
             <span className="hidden sm:inline">AWS </span>WordCard
           </h1>
           {/* 【絞り込み中カテゴリ表示】「すべて」以外を選択中のみ表示 */}
