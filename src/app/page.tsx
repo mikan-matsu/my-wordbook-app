@@ -85,7 +85,7 @@ export default function Home() {
   const [isFlipped, setIsFlipped] = useState(false); // カード表示状態（表面:false/裏面:true）
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバーの開閉状態
 
-  // 【単語リストのスクロールヒント】上下にまだ続きがあるかを判定し、フェードグラデーションの表示に使う
+  // 【単語リストのスクロールヒント】上下にまだ続きがあるかを判定し、矢印アイコンの表示に使う
   const wordListRef = useRef<HTMLElement>(null);
   const [wordListScroll, setWordListScroll] = useState({ canScrollUp: false, canScrollDown: false });
   const updateWordListScrollState = useCallback(() => {
@@ -719,12 +719,12 @@ export default function Home() {
               ))}
             </div>
           </div>
-          {/* 単語一覧のスクロール領域：上下にまだ続きがある時だけフェードグラデーションを重ねて、スクロールできることを示す */}
-          <div className="relative flex-1 min-h-0">
+          {/* 単語一覧のスクロール領域：スクロール可能な範囲全体を薄い青色にし、続きがある方向に矢印アイコンを表示してスクロールできることを示す */}
+          <div className="relative flex-1 min-h-0 bg-blue-50/40">
             <nav
               ref={wordListRef}
               onScroll={updateWordListScrollState}
-              className="h-full overflow-y-auto p-3 custom-scrollbar"
+              className="h-full overflow-y-auto p-3 word-list-scrollbar"
             >
             {visibleWords.map((w, idx) => (
               <div key={w.id} className={`flex items-center rounded-xl mb-1 border transition-all ${(word?.id === w.id) ? "bg-blue-50 border-blue-200" : "bg-transparent border-transparent"}`}>
@@ -755,10 +755,22 @@ export default function Home() {
             ))}
             </nav>
             {wordListScroll.canScrollUp && (
-              <div className="pointer-events-none absolute top-0 inset-x-0 h-4 bg-amber-100" />
+              <div className="pointer-events-none absolute top-1.5 inset-x-0 flex justify-center">
+                <span className="w-6 h-6 rounded-full bg-white shadow flex items-center justify-center text-slate-400">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                </span>
+              </div>
             )}
             {wordListScroll.canScrollDown && (
-              <div className="pointer-events-none absolute bottom-0 inset-x-0 h-4 bg-amber-100" />
+              <div className="pointer-events-none absolute bottom-1.5 inset-x-0 flex justify-center">
+                <span className="w-6 h-6 rounded-full bg-white shadow flex items-center justify-center text-slate-400">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -1180,6 +1192,12 @@ export default function Home() {
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        /* 単語リストのスクロールバー：スクロールできることが分かるよう太く・濃い色で目立たせる */
+        .word-list-scrollbar { scrollbar-width: auto; scrollbar-color: #94a3b8 #f1f5f9; }
+        .word-list-scrollbar::-webkit-scrollbar { width: 10px; }
+        .word-list-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .word-list-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; }
+        .word-list-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
         .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
         .scrollable-bg {
           background: rgba(147, 197, 253, 0.10);
