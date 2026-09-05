@@ -724,7 +724,7 @@ export default function Home() {
               className="h-full overflow-y-auto p-3 word-list-scrollbar"
             >
             {visibleWords.map((w, idx) => (
-              <div key={w.id} className={`flex items-center rounded-xl mb-1 transition-all ${(word?.id === w.id) ? "bg-white border border-blue-300 shadow-sm" : "bg-transparent border border-transparent border-b-blue-200/60"}`}>
+              <div key={w.id} className={`flex items-center rounded-xl mb-1 transition-all ${(word?.id === w.id) ? "bg-blue-200 border border-blue-300 shadow-sm" : "bg-transparent border border-transparent border-b-blue-200/60"}`}>
                 {/* 単語ボタン：クリックで該当単語へジャンプ */}
                 <button onClick={() => { setCurrentIndex(idx); setIsFlipped(false); }} className="flex-1 text-left px-4 py-3 text-sm truncate font-bold text-slate-700 flex items-center gap-2 min-w-0">
                   <span className="opacity-30 font-mono text-xs">{idx + 1}</span>
