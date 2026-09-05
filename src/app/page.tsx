@@ -124,6 +124,7 @@ export default function Home() {
   // 【ログイン状態管理】
   const [authUser, setAuthUser] = useState<{ username: string; email?: string } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [showEmailPopover, setShowEmailPopover] = useState(false); // アバターをタップ/クリックした時にメールアドレスを表示するポップオーバー
 
   const checkCurrentUser = useCallback(async () => {
     if (isMockAuth) {
@@ -163,6 +164,7 @@ export default function Home() {
   }, []);
 
   const handleLogout = useCallback(() => {
+    setShowEmailPopover(false);
     signOut();
   }, []);
 
@@ -587,14 +589,40 @@ export default function Home() {
         </button>
       </div>
 
-      {/* 【ログインボタン】未ログイン時はGoogleログイン、ログイン時はメールアドレスとログアウトボタンを表示 */}
+      {/* 【ログイン中ポップオーバーの背景】アバター以外の場所をクリック/タップすると閉じる */}
+      {showEmailPopover && (
+        <div className="fixed inset-0 z-[690]" onClick={() => setShowEmailPopover(false)} />
+      )}
+
+      {/* 【ログインボタン】未ログイン時はGoogleログイン、ログイン時はアバター（アイコン）とログアウトボタンを表示。
+          メールアドレスは常時表示せず、アバターのホバー(PC)/タップ(スマホ)でポップオーバー表示する。
+          これによりログイン中でもヘッダー右側の幅が常に一定になり、タイトルとの重なりが起きなくなる */}
       <div className="fixed top-8 right-6 z-[700] flex flex-col items-center gap-1">
         {!isAuthLoading && (
           authUser ? (
-            <div className="flex items-center gap-2 bg-white shadow-xl rounded-2xl px-3 py-2">
-              <span className="text-xs font-bold text-slate-500 max-w-[120px] truncate hidden sm:inline">{authUser.email || authUser.username}</span>
-              <button onClick={handleLogout} className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-black active:scale-95 transition-transform">
-                ログアウト
+            <div className="flex items-center gap-2 bg-white shadow-xl rounded-2xl px-2 py-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowEmailPopover((v) => !v)}
+                  title={authUser.email || authUser.username}
+                  aria-label="ログイン中のアカウント"
+                  className="w-8 h-8 rounded-full bg-blue-400 text-white text-sm font-black flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+                >
+                  {(authUser.email || authUser.username || "?").charAt(0).toUpperCase()}
+                </button>
+                {showEmailPopover && (
+                  <div className="absolute top-full right-0 mt-2 bg-white shadow-xl rounded-xl px-3 py-2 text-xs font-bold text-slate-600 whitespace-nowrap">
+                    {authUser.email || authUser.username}
+                  </div>
+                )}
+              </div>
+              <button onClick={handleLogout} aria-label="ログアウト" className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-black active:scale-95 transition-transform">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span className="hidden sm:inline">ログアウト</span>
               </button>
             </div>
           ) : (
@@ -710,8 +738,8 @@ export default function Home() {
       {/* 【メインエリア】カード表示と操作エリア */}
       <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-28 overflow-y-auto overflow-x-hidden transition-all duration-300">
         
-        {/* 【アプリタイトル】カード領域内で中央配置。左右固定要素（メニュー/ログイン）と重ならないよう幅を制限 */}
-        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[100px] sm:max-w-[300px] md:max-w-none translate-x-[calc(-50%-16px)] sm:translate-x-[calc(-50%-90px)]">
+        {/* 【アプリタイトル】カードと完全に中心を揃える（ビューポート中央固定）。左右のヘッダー要素は幅が変動しても重ならないよう幅を制限する */}
+        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[100px] sm:max-w-[220px] md:max-w-none -translate-x-1/2">
           <h1 className={`font-extrabold tracking-wide select-none block text-blue-400 transition-all duration-300 truncate max-w-full text-base sm:text-2xl h-12 leading-[3rem] ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
             <span className="hidden sm:inline">AWS </span>WordCard
           </h1>
