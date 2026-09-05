@@ -839,9 +839,9 @@ export default function Home() {
       <main className="fixed inset-0 md:relative md:inset-auto md:flex-1 bg-blue-50/30 flex flex-col items-center p-4 pt-32 overflow-y-auto overflow-x-hidden transition-all duration-300">
         
         {/* 【アプリタイトル】カードと完全に中心を揃える（ビューポート中央固定）。左右のヘッダー要素は幅が変動しても重ならないよう幅を制限する */}
-        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[130px] sm:max-w-[220px] md:max-w-none -translate-x-1/2">
-          <h1 className={`font-extrabold tracking-wide select-none block text-blue-400 transition-all duration-300 truncate max-w-full text-lg sm:text-2xl h-12 leading-[3rem] ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
-            <span className="hidden sm:inline">AWS </span>WordCard
+        <div className="absolute top-8 left-1/2 z-[200] flex flex-col items-center transition-all duration-300 pointer-events-none max-w-[150px] sm:max-w-[220px] md:max-w-none -translate-x-1/2">
+          <h1 className={`font-extrabold tracking-wide select-none block text-blue-400 transition-all duration-300 truncate max-w-full text-base sm:text-2xl h-12 leading-[3rem] ${isSidebarOpen ? 'md:text-3xl' : 'md:text-4xl'}`} style={{ fontFamily: "'Noto Serif JP', 'Zen Old Mincho', 'Georgia', serif", fontWeight: 600, letterSpacing: '0.02em' }}>
+            AWS WordCard
           </h1>
           {/* 【絞り込み中カテゴリ表示】「すべて」以外を選択中のみ表示 */}
           {selectedCategory !== "すべて" && (
