@@ -853,7 +853,7 @@ export default function Home() {
                   <div className="flex-1 flex flex-col items-center justify-center px-12 text-center pointer-events-none">
                     <h1
                       className="font-black text-slate-900 leading-none tracking-tighter select-none text-balance"
-                      style={{ fontSize: word.word.length > 10 ? "clamp(1.5rem, 6vw, 3.5rem)" : "clamp(2rem, 8vw, 5rem)", wordBreak: "auto-phrase" } as React.CSSProperties}
+                      style={{ fontSize: word.word.length > 10 ? "clamp(1.5rem, 6vw, 3.5rem)" : "clamp(2rem, 8vw, 5rem)", wordBreak: "auto-phrase", overflowWrap: "anywhere" } as React.CSSProperties}
                     >
                       {word.word}
                     </h1>
@@ -939,7 +939,7 @@ export default function Home() {
                       <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
                       <h2
                         className="font-black text-blue-600 leading-tight select-none text-balance"
-                        style={{ fontSize: word.meaning.length > 20 ? "clamp(1.1rem, 3.5vw, 1.875rem)" : "clamp(1.25rem, 4.5vw, 2.25rem)", wordBreak: "auto-phrase" } as React.CSSProperties}
+                        style={{ fontSize: word.meaning.length > 20 ? "clamp(1.1rem, 3.5vw, 1.875rem)" : "clamp(1.25rem, 4.5vw, 2.25rem)", wordBreak: "auto-phrase", overflowWrap: "anywhere" } as React.CSSProperties}
                       >
                         {word.meaning}
                       </h2>
