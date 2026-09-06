@@ -23,7 +23,7 @@ const cardVariants: Variants = {
 };
 
 // 【カテゴリ一覧】"すべて"は絞り込み解除を表す特別値。マイ単語はログイン時のみ表示に追加する
-const CATEGORIES = ["すべて", "基本用語", "ネットワーク用語", "コンピューティング", "セキュリティ関連"];
+const CATEGORIES = ["すべて", "基本用語", "ネットワーク用語", "コンピューティング", "ストレージ/データベース", "セキュリティ関連"];
 const MY_WORD_CATEGORY = "マイ単語";
 // 【マイカテゴリ】既存の単語の中から自分で選んで登録する専用リスト。word.categoryではなくprogressMap[wordId].inMyCategoryで判定する特別なカテゴリ値
 const MY_CATEGORY = "マイカテゴリ";
@@ -31,6 +31,7 @@ const MY_CATEGORY = "マイカテゴリ";
 const CATEGORY_DISPLAY_LABELS: Record<string, string> = {
   "基本用語": "基本",
   "ネットワーク用語": "ネットワーク",
+  "ストレージ/データベース": "ストレージ/DB",
   "セキュリティ関連": "セキュリティ",
 };
 
@@ -105,6 +106,14 @@ export default function Home() {
       canScrollUp: el.scrollTop > 4,
       canScrollDown: el.scrollTop + el.clientHeight < el.scrollHeight - 4,
     });
+  }, []);
+  // 【サイドバーの自動追従】カード送りで表示中の単語が変わったら、サイドバーのハイライト行が
+  // 画面外に隠れないよう自動でスクロール位置を追従させる
+  const scrollActiveWordIntoView = useCallback((wordId: string) => {
+    const container = wordListRef.current;
+    if (!container) return;
+    const target = container.querySelector<HTMLElement>(`[data-word-id="${CSS.escape(wordId)}"]`);
+    target?.scrollIntoView({ block: "nearest" });
   }, []);
   const [showOnboarding, setShowOnboarding] = useState(false); // 使い方説明オーバーレイの表示状態
   const [onboardingStep, setOnboardingStep] = useState(0); // 使い方説明の現在ページ（0始まり）
@@ -373,55 +382,57 @@ export default function Home() {
     fetchMyWords();
   }, [fetchMyWords]);
 
+  // 【編集中のマイ単語】nullなら新規追加モード、IDが入っていれば編集モード（同じモーダルを流用する）
+  const [editingMyWordId, setEditingMyWordId] = useState<string | null>(null);
+
+  const handleStartEditMyWord = useCallback((w: { id: string; word: string; meaning: string; description?: string }) => {
+    setEditingMyWordId(w.id);
+    setNewWordForm({ word: w.word, meaning: w.meaning, description: w.description || "" });
+    setIsAddModalOpen(true);
+  }, []);
+
+  const closeAddModal = useCallback(() => {
+    setIsAddModalOpen(false);
+    setEditingMyWordId(null);
+    setNewWordForm({ word: "", meaning: "", description: "" });
+  }, []);
+
   const handleAddMyWord = useCallback(async () => {
     if (!authUser || !newWordForm.word.trim() || !newWordForm.meaning.trim()) return;
     setIsSavingWord(true);
+    const trimmed = {
+      word: newWordForm.word.trim(),
+      meaning: newWordForm.meaning.trim(),
+      description: newWordForm.description.trim() || undefined,
+    };
 
     if (isMockAuth) {
-      // モックログイン：ローカル配列に直接追加（デザイン確認用）
-      setMyWords((prev) => [...prev, {
-        id: `mock_${Date.now()}`,
-        word: newWordForm.word.trim(),
-        meaning: newWordForm.meaning.trim(),
-        description: newWordForm.description.trim() || undefined,
-      }]);
-      setNewWordForm({ word: "", meaning: "", description: "" });
-      setIsAddModalOpen(false);
+      // モックログイン：ローカル配列に直接追加・更新（デザイン確認用）
+      if (editingMyWordId) {
+        setMyWords((prev) => prev.map((w) => (w.id === editingMyWordId ? { ...w, ...trimmed } : w)));
+      } else {
+        setMyWords((prev) => [...prev, { id: `mock_${Date.now()}`, ...trimmed }]);
+      }
+      closeAddModal();
       setIsSavingWord(false);
       return;
     }
 
     try {
       const client = generateClient<Schema>({ authMode: "userPool" });
-      await client.models.MyWord.create({
-        id: `${Date.now()}_${authUser.username}`,
-        word: newWordForm.word.trim(),
-        meaning: newWordForm.meaning.trim(),
-        description: newWordForm.description.trim() || undefined,
-      });
-      setNewWordForm({ word: "", meaning: "", description: "" });
-      setIsAddModalOpen(false);
+      if (editingMyWordId) {
+        await client.models.MyWord.update({ id: editingMyWordId, ...trimmed });
+      } else {
+        await client.models.MyWord.create({ id: `${Date.now()}_${authUser.username}`, ...trimmed });
+      }
+      closeAddModal();
       await fetchMyWords();
     } catch (e) {
-      console.error("マイ単語追加エラー:", e);
+      console.error("マイ単語保存エラー:", e);
     } finally {
       setIsSavingWord(false);
     }
-  }, [authUser, isMockAuth, newWordForm, fetchMyWords]);
-
-  const handleDeleteMyWord = useCallback(async (id: string) => {
-    if (isMockAuth) {
-      setMyWords((prev) => prev.filter((w) => w.id !== id));
-      return;
-    }
-    try {
-      const client = generateClient<Schema>({ authMode: "userPool" });
-      await client.models.MyWord.delete({ id });
-      setMyWords((prev) => prev.filter((w) => w.id !== id));
-    } catch (e) {
-      console.error("マイ単語削除エラー:", e);
-    }
-  }, [isMockAuth]);
+  }, [authUser, isMockAuth, newWordForm, fetchMyWords, editingMyWordId, closeAddModal]);
 
   // 【サイドバースワイプ検出】
   const sidebarTouchStartRef = useRef<number>(0); // スワイプ開始位置
@@ -433,12 +444,35 @@ export default function Home() {
     const touchEndX = e.changedTouches[0].clientX;
     const touchStartX = sidebarTouchStartRef.current;
     const swipeDistance = touchStartX - touchEndX; // 右方向の移動距離（正数 = 左へのスワイプ）
-    
+
     // 左方向へのスワイプ（50px以上）でサイドバーを閉じる
     if (swipeDistance > 50) {
       setIsSidebarOpen(false);
     }
   }, []);
+
+  // 【画面端スワイプでサイドバーを開く】サイドバーが閉じている間は幅0で領域が無いため、
+  // 画面左端(24px以内)から始まる右方向スワイプを画面全体で検出して開く
+  useEffect(() => {
+    if (isSidebarOpen) return;
+    let startX: number | null = null;
+    const onTouchStart = (e: TouchEvent) => {
+      const x = e.touches[0].clientX;
+      startX = x <= 24 ? x : null;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (startX === null) return;
+      const endX = e.changedTouches[0].clientX;
+      if (endX - startX > 50) setIsSidebarOpen(true);
+      startX = null;
+    };
+    window.addEventListener("touchstart", onTouchStart);
+    window.addEventListener("touchend", onTouchEnd);
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [isSidebarOpen]);
 
   // 【初期化】Amplify Dataクライアントでwordテーブルから単語データを取得
   useEffect(() => {
@@ -507,10 +541,16 @@ export default function Home() {
 
   // 【進捗フィルター】覚えた/まだで絞り込む
   const [progressFilter, setProgressFilter] = useState<"all" | "learned" | "unlearned">("all");
+  // 【検索】単語・意味に部分一致するものだけに絞り込む（カテゴリ・進捗フィルターと併用可能）
+  const [searchQuery, setSearchQuery] = useState("");
+  // 【ランダム表示】オンにすると出題順をシャッフルする。再タップでシャッフルし直せるようshuffleSeedを更新する
+  const [isShuffleOn, setIsShuffleOn] = useState(false);
+  const [shuffleSeed, setShuffleSeed] = useState(0);
 
-  // 【フィルター】hiddenステータス以外・選択中カテゴリ・進捗状態で絞り込み（学習対象の単語リスト）
-  const visibleWords = useMemo(
-    () => combinedWords.filter(w => {
+  // 【フィルター】hiddenステータス以外・選択中カテゴリ・進捗状態・検索語で絞り込み（学習対象の単語リスト）
+  const filteredWords = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return combinedWords.filter(w => {
       if (!w.isVisible) return false;
       if (selectedCategory === MY_CATEGORY) {
         if (progressMap[w.id]?.inMyCategory !== true) return false;
@@ -520,21 +560,85 @@ export default function Home() {
       const learned = progressMap[w.id]?.learned === true;
       if (progressFilter === "learned" && !learned) return false;
       if (progressFilter === "unlearned" && learned) return false;
+      if (q && !w.word.toLowerCase().includes(q) && !(w.meaning || "").toLowerCase().includes(q)) return false;
       return true;
-    }),
-    [combinedWords, selectedCategory, progressFilter, progressMap]
+    });
+  }, [combinedWords, selectedCategory, progressFilter, progressMap, searchQuery]);
+
+  // 【ランダム表示の適用】シャッフルON時のみ、絞り込み結果の順序をランダムに入れ替える。
+  // Math.random()はレンダー中に呼べない（純粋でない）ため、useMemoではなくuseEffect+state で行う
+  const [shuffledWords, setShuffledWords] = useState<typeof filteredWords>([]);
+  useEffect(() => {
+    if (!isShuffleOn) {
+      setShuffledWords(filteredWords);
+      return;
+    }
+    const arr = [...filteredWords];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    setShuffledWords(arr);
+  }, [filteredWords, isShuffleOn, shuffleSeed]);
+  const visibleWords = isShuffleOn ? shuffledWords : filteredWords;
+
+  // 【学習サマリー】現在の絞り込み条件内で「覚えた」の件数を表示する
+  const learnedCountInView = useMemo(
+    () => visibleWords.filter((w) => progressMap[w.id]?.learned === true).length,
+    [visibleWords, progressMap]
   );
+
+  // 【削除対象の確認待ち】削除ボタンを押した直後は確認ダイアログを表示するだけにし、
+  // 実際の削除はユーザーが確認モーダルで確定してから行う
+  const [wordPendingDelete, setWordPendingDelete] = useState<{ id: string; word: string } | null>(null);
+
+  const handleDeleteMyWord = useCallback(async (id: string) => {
+    // 削除によって表示中の単語より前の位置にあった単語が消える場合、表示位置(currentIndex)を
+    // 1つ前に詰めないと、閲覧中の単語と違う単語にすり替わって表示されてしまうため補正する
+    const deletedIndexInVisible = visibleWords.findIndex((w) => w.id === id);
+    const adjustIndex = () => {
+      if (deletedIndexInVisible !== -1 && deletedIndexInVisible < currentIndex) {
+        setCurrentIndex((i) => Math.max(0, i - 1));
+      }
+    };
+
+    if (isMockAuth) {
+      setMyWords((prev) => prev.filter((w) => w.id !== id));
+      adjustIndex();
+      return;
+    }
+    try {
+      const client = generateClient<Schema>({ authMode: "userPool" });
+      await client.models.MyWord.delete({ id });
+      setMyWords((prev) => prev.filter((w) => w.id !== id));
+      adjustIndex();
+    } catch (e) {
+      console.error("マイ単語削除エラー:", e);
+    }
+  }, [isMockAuth, visibleWords, currentIndex]);
+
+  const handleConfirmDeleteMyWord = useCallback(() => {
+    if (!wordPendingDelete) return;
+    handleDeleteMyWord(wordPendingDelete.id);
+    setWordPendingDelete(null);
+  }, [wordPendingDelete, handleDeleteMyWord]);
 
   // 【単語リストのスクロールヒント再計算】絞り込みでリストの件数(=高さ)が変わるたびに判定し直す
   useEffect(() => {
     updateWordListScrollState();
   }, [visibleWords, updateWordListScrollState]);
 
-  // 【絞り込み切り替え】カテゴリ・進捗フィルターが変わったら表示位置を先頭に戻す
+  // 【絞り込み切り替え】カテゴリ・進捗・検索・ランダム表示が変わったら表示位置を先頭に戻す
   useEffect(() => {
     setCurrentIndex(0);
     setIsFlipped(false);
-  }, [selectedCategory, progressFilter]);
+  }, [selectedCategory, progressFilter, searchQuery, isShuffleOn, shuffleSeed]);
+
+  // 【サイドバー自動追従】カード送りで表示中の単語が変わるたびに、サイドバーのハイライト行を追従スクロールする
+  useEffect(() => {
+    const current = visibleWords[currentIndex];
+    if (current) scrollActiveWordIntoView(current.id);
+  }, [currentIndex, visibleWords, scrollActiveWordIntoView]);
 
   // 【次の単語へ移動】表面と裏面の切り替えと単語の進行を管理
   const handleNext = useCallback(() => {
@@ -584,6 +688,14 @@ export default function Home() {
   // 【キーボード操作】矢印キーとスペースキーでカード操作
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // フォーム入力中（単語追加モーダルの入力欄など）は、スペース入力やカーソル移動を
+      // 妨げないよう、カード送りのショートカットを無効化する
+      const target = e.target as HTMLElement | null;
+      const isTypingTarget = !!target && (
+        target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable
+      );
+      if (isTypingTarget) return;
+
       // 右矢印キー or スペースキー：次へ進む
       if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); handleNext(); }
       // 左矢印キー：前へ戻る
@@ -645,7 +757,7 @@ export default function Home() {
       )}
 
       {/* 【メニューボタン】ハンバーガーメニュー。z-indexを[700]に設定して最前面に配置 */}
-      <div className="fixed top-8 left-4 z-[700] flex items-center gap-3">
+      <div className="fixed top-4 left-3 z-[700] flex items-center gap-3">
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-3 bg-white shadow-xl rounded-2xl text-slate-600 active:scale-95 transition-transform">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
@@ -730,8 +842,21 @@ export default function Home() {
         onTouchEnd={handleSidebarTouchEnd}
       >
         <div className="w-[280px] h-full flex flex-col">
+          {/* 【検索】単語・意味を部分一致で検索する */}
+          <div className="mt-20 mx-3 relative">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none">
+              <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="単語・意味を検索"
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:border-blue-300"
+            />
+          </div>
           {/* カテゴリフィルター */}
-          <div className="mt-24 mx-3 px-3 py-3 rounded-2xl border border-blue-100 bg-blue-50">
+          <div className="mt-3 mx-3 px-3 py-3 rounded-2xl border border-blue-100 bg-blue-50">
             <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-500 tracking-widest select-none">カテゴリ</span>
             <div className="flex flex-wrap gap-1.5">
               {categories.map((cat) => (
@@ -753,7 +878,13 @@ export default function Home() {
           </div>
           {/* 進捗フィルター */}
           <div className="px-3 pt-4 pb-3 border-b border-slate-50">
-            <span className="block px-1 mb-1.5 text-[10px] font-black text-slate-500 tracking-widest select-none">進捗</span>
+            <div className="flex items-center justify-between px-1 mb-1.5">
+              <span className="text-[10px] font-black text-slate-500 tracking-widest select-none">進捗</span>
+              {/* 【学習サマリー】現在の絞り込み内での「覚えた」件数 */}
+              <span className="text-[10px] font-black text-emerald-500 tracking-wide select-none">
+                覚えた {learnedCountInView} / {visibleWords.length}
+              </span>
+            </div>
             <div className="flex gap-1.5">
               {([
                 { key: "all", label: "すべて" },
@@ -769,6 +900,14 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {/* 【ランダム表示】オンの間は出題順をシャッフルする。オンの状態で再タップすると出題順を引き直す */}
+            <button
+              onClick={() => { if (isShuffleOn) setShuffleSeed((s) => s + 1); setIsShuffleOn((v) => !v); }}
+              aria-label="ランダム表示"
+              className={`mt-1.5 w-full flex items-center justify-center px-3 py-1.5 rounded-full text-xs font-bold transition-all ${isShuffleOn ? "bg-blue-400 text-white" : "bg-slate-100 text-slate-500"}`}
+            >
+              {isShuffleOn ? "ランダム表示 中（タップで引き直す）" : "ランダム表示にする"}
+            </button>
           </div>
           {/* 単語一覧のスクロール領域：スクロール可能な範囲全体を薄い青色にし、続きがある方向に矢印アイコンを表示してスクロールできることを示す */}
           <div className="relative flex-1 min-h-0 bg-blue-50">
@@ -778,7 +917,7 @@ export default function Home() {
               className="h-full overflow-y-auto p-3 word-list-scrollbar"
             >
             {visibleWords.map((w, idx) => (
-              <div key={w.id} className={`flex items-center rounded-xl mb-1 transition-all ${(word?.id === w.id) ? "bg-blue-200 border border-blue-300 shadow-sm" : "bg-transparent border border-transparent border-b-blue-200/60"}`}>
+              <div key={w.id} data-word-id={w.id} className={`flex items-center rounded-xl mb-1 transition-all ${(word?.id === w.id) ? "bg-blue-200 border border-blue-300 shadow-sm" : "bg-transparent border border-transparent border-b-blue-200/60"}`}>
                 {/* 単語ボタン：クリックで該当単語へジャンプ */}
                 <button onClick={() => { setCurrentIndex(idx); setIsFlipped(false); }} className="flex-1 text-left px-4 py-3 text-sm truncate font-bold text-slate-700 flex items-center gap-2 min-w-0">
                   <span className="opacity-30 font-mono text-xs">{idx + 1}</span>
@@ -793,7 +932,19 @@ export default function Home() {
                 </button>
                 {w.isMyWord && (
                   <button
-                    onClick={() => handleDeleteMyWord(w.id)}
+                    onClick={() => handleStartEditMyWord(w)}
+                    className="flex-shrink-0 p-2 text-slate-300 hover:text-blue-400 transition-colors"
+                    title="編集"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9"></path>
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                    </svg>
+                  </button>
+                )}
+                {w.isMyWord && (
+                  <button
+                    onClick={() => setWordPendingDelete({ id: w.id, word: w.word })}
                     className="flex-shrink-0 p-2 mr-1 text-slate-300 hover:text-red-400 transition-colors"
                     title="削除"
                   >
@@ -850,7 +1001,7 @@ export default function Home() {
             <div className="w-full h-full flex flex-col items-center justify-center text-center px-6 shadow-[0_40px_80px_rgba(0,0,0,0.08)] rounded-[3rem] bg-white">
               <p className="text-slate-500 font-bold mb-4">この絞り込み条件に該当する単語がありません。</p>
               <button
-                onClick={() => { setSelectedCategory("すべて"); setProgressFilter("all"); }}
+                onClick={() => { setSelectedCategory("すべて"); setProgressFilter("all"); setSearchQuery(""); }}
                 className="px-5 py-2.5 rounded-full bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform"
               >
                 絞り込みを解除する
@@ -1013,10 +1164,10 @@ export default function Home() {
                   </div>
 
                   {/* コンテンツエリア */}
-                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-40 pb-16">
+                  <div className="relative flex flex-col h-full px-8 md:px-20 pt-24 pb-16">
                     {/* ヘッダー */}
                     <div className="relative text-center mb-3 flex-shrink-0 pointer-events-none">
-                      <p className="text-slate-400 text-[10px] font-black tracking-widest uppercase mb-2 select-none">{word.word}</p>
+                      <p className="text-slate-400 text-[10px] font-black tracking-widest mb-2 select-none">{word.word}</p>
                       <h2
                         className="font-black text-blue-600 leading-tight select-none text-balance"
                         style={{ fontSize: word.meaning.length > 20 ? "clamp(1.1rem, 3.5vw, 1.875rem)" : "clamp(1.25rem, 4.5vw, 2.25rem)", wordBreak: "auto-phrase", overflowWrap: "anywhere" } as React.CSSProperties}
@@ -1215,9 +1366,22 @@ export default function Home() {
       })()}
 
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={() => setIsAddModalOpen(false)}>
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-black text-slate-800 mb-4">マイ単語を追加</h3>
+        // 【背景クリックでは閉じない】入力途中の内容が誤操作で消えないよう、閉じる手段は
+        // 右上のバツボタンとキャンセルボタンのみにしている
+        <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-black text-slate-800">{editingMyWordId ? "マイ単語を編集" : "マイ単語を追加"}</h3>
+              <button
+                onClick={closeAddModal}
+                aria-label="閉じる"
+                className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 active:scale-95 transition-transform"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] font-black text-slate-400 tracking-widest">単語</label>
@@ -1252,7 +1416,7 @@ export default function Home() {
             </div>
             <div className="flex gap-2 mt-5">
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={closeAddModal}
                 className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-black active:scale-95 transition-transform"
               >
                 キャンセル
@@ -1262,7 +1426,33 @@ export default function Home() {
                 disabled={isSavingWord || !newWordForm.word.trim() || !newWordForm.meaning.trim()}
                 className="flex-1 py-2.5 rounded-xl bg-blue-400 text-white text-sm font-black active:scale-95 transition-transform disabled:opacity-50"
               >
-                {isSavingWord ? "保存中..." : "追加"}
+                {isSavingWord ? "保存中..." : editingMyWordId ? "保存" : "追加"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 【マイ単語削除の確認ダイアログ】誤タップで即削除されないよう、削除前に必ず確認する */}
+      {wordPendingDelete && (
+        <div className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4" onClick={() => setWordPendingDelete(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-black text-slate-800 mb-2">単語を削除しますか？</h3>
+            <p className="text-sm text-slate-500 font-bold mb-5">
+              「{wordPendingDelete.word}」を削除します。この操作は取り消せません。
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setWordPendingDelete(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-black active:scale-95 transition-transform"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleConfirmDeleteMyWord}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black active:scale-95 transition-transform"
+              >
+                削除する
               </button>
             </div>
           </div>
