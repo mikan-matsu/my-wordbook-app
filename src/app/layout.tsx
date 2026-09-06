@@ -20,6 +20,15 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "My Wordbook App",
   description: "Simple wordbook with Amplify",
+  manifest: "/manifest.json",
+  icons: {
+    icon: ["/icon-192.png", "/icon-512.png"],
+    apple: "/icon-192.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#60a5fa",
 };
 
 export default function RootLayout({
