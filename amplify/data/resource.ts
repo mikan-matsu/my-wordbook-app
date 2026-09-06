@@ -16,7 +16,11 @@ const schema = a.schema({
     })
     .identifier(['id'])
     .secondaryIndexes((index) => [index('status').name('byStatus').queryField('wordsByStatus')])
-    .authorization((allow) => [allow.publicApiKey()]),
+    // 単語データの追加・編集・削除はCLI/コンソールから管理者が行う運用のため、
+    // ブラウザに同梱される公開APIキーには読み取り権限のみを与える。
+    // (キーはクライアントバンドルに含まれるため誰でも取得可能。write権限を
+    // 与えたままだと第三者が全単語を書き換え・削除できてしまう)
+    .authorization((allow) => [allow.publicApiKey().to(['read'])]),
 
   // ログインユーザー本人の学習進捗（覚えた/まだ、マイカテゴリ登録）。個人情報は持たず、Cognitoのsubのみをキーにする。
   WordProgress: a
