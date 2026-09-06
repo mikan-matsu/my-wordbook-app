@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "My Wordbook App",
-  description: "Simple wordbook with Amplify",
+  title: "AWS WordCard | クラウド・ITインフラ用語帳",
+  description: "AWSやクラウド、ネットワーク、セキュリティのIT用語をカード形式で学べる単語帳アプリ。基本用語からAWSの実サービス名まで収録。",
   manifest: "/manifest.json",
   icons: {
     icon: ["/icon-192.png", "/icon-512.png"],

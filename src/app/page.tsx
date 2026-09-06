@@ -1,8 +1,9 @@
 // 【クライアントコンポーネント】React Hooksを使用するため"use client"が必須
 "use client";
+import Link from "next/link";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { generateClient } from "aws-amplify/data";
-import { fetchUserAttributes, getCurrentUser, signInWithRedirect, signOut } from "aws-amplify/auth";
+import { deleteUser, fetchUserAttributes, getCurrentUser, signInWithRedirect, signOut } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 import type { Schema } from "../../amplify/data/resource";
 import { motion, AnimatePresence, Variants } from "framer-motion";
@@ -160,6 +161,9 @@ export default function Home() {
   const [authUser, setAuthUser] = useState<{ username: string; email?: string } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [showEmailPopover, setShowEmailPopover] = useState(false); // アバターをタップ/クリックした時にメールアドレスを表示するポップオーバー
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false); // アカウント削除の確認ダイアログ表示中か
+  const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState(""); // 誤操作防止のため「削除」と入力させる
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const checkCurrentUser = useCallback(async () => {
     if (isMockAuth) {
@@ -217,6 +221,50 @@ export default function Home() {
     }
     signOut();
   }, [isMockAuth]);
+
+  // 【利用データ削除+ログアウト】自分の学習データ(MyWord・WordProgress)を全件削除したうえで、Cognito側のログイン情報自体も自己削除する。
+  // 成功するとdeleteUser()が自動的にサインアウトも行う
+  const handleDeleteAccount = useCallback(async () => {
+    if (!authUser) return;
+    if (isMockAuth) {
+      // develop等のモックログイン中は実際のバックエンド操作をせず、ログアウトのみ行う
+      setShowDeleteAccountConfirm(false);
+      handleLogout();
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      const client = generateClient<Schema>({ authMode: "userPool" });
+
+      let myWordItems: any[] = [];
+      let cursor: string | null | undefined = undefined;
+      do {
+        const result: any = await client.models.MyWord.list({ limit: 1000, nextToken: cursor });
+        myWordItems = myWordItems.concat(result.data || []);
+        cursor = result.nextToken;
+      } while (cursor);
+      for (const item of myWordItems) {
+        await client.models.MyWord.delete({ id: item.id });
+      }
+
+      let progressItems: any[] = [];
+      cursor = undefined;
+      do {
+        const result: any = await client.models.WordProgress.list({ limit: 1000, nextToken: cursor });
+        progressItems = progressItems.concat(result.data || []);
+        cursor = result.nextToken;
+      } while (cursor);
+      for (const item of progressItems) {
+        await client.models.WordProgress.delete({ id: item.id });
+      }
+
+      await deleteUser();
+    } catch (e) {
+      console.error("利用データ削除エラー:", e);
+      alert("利用データの削除に失敗しました。時間をおいて再度お試しください。");
+      setIsDeletingAccount(false);
+    }
+  }, [authUser, isMockAuth, handleLogout]);
 
   // 【学習進捗管理】wordId -> 覚えたか/マイカテゴリ登録済みか。未ログイン時はlocalStorage、ログイン時はDB(WordProgress)で管理する
   const LOCAL_PROGRESS_KEY = "wordcard_local_progress";
@@ -1265,6 +1313,24 @@ export default function Home() {
           )}
         </div>
 
+        {/* 【フッターリンク】使い方・用語一覧・プライバシーポリシーへの導線。横並び、狭い画面では横スクロール */}
+        <div className="w-full max-w-5xl mt-3 flex-shrink-0 flex items-center justify-center gap-5 overflow-x-auto whitespace-nowrap px-2 z-[100]">
+          <button onClick={() => setShowOnboarding(true)} className="text-[11px] text-slate-400 hover:text-slate-600 hover:underline flex-shrink-0">
+            使い方
+          </button>
+          <Link href="/words" className="text-[11px] text-slate-400 hover:text-slate-600 hover:underline flex-shrink-0">
+            用語一覧
+          </Link>
+          <Link href="/privacy" className="text-[11px] text-slate-400 hover:text-slate-600 hover:underline flex-shrink-0">
+            プライバシーポリシー
+          </Link>
+          {authUser && (
+            <button onClick={() => setShowDeleteAccountConfirm(true)} className="text-[11px] text-slate-400 hover:text-red-500 hover:underline flex-shrink-0">
+              利用データを削除してログアウト
+            </button>
+          )}
+        </div>
+
         {/* カード外の判定レイヤー */}
         <div className="absolute inset-0 flex pointer-events-none z-[10]" style={{ height: '100vh' }}>
           {/* 左操作エリア */}
@@ -1453,6 +1519,55 @@ export default function Home() {
                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black active:scale-95 transition-transform"
               >
                 削除する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 【アカウント削除の確認ダイアログ】不可逆な操作のため、「削除」と入力しないとボタンを押せないようにする */}
+      {showDeleteAccountConfirm && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 z-[900] flex items-center justify-center p-4"
+          onClick={() => {
+            if (isDeletingAccount) return;
+            setShowDeleteAccountConfirm(false);
+            setDeleteAccountConfirmText("");
+          }}
+        >
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-black text-slate-800 mb-2">利用データを削除してログアウトしますか？</h3>
+            <p className="text-sm text-slate-500 font-bold mb-4">
+              学習進捗・マイ単語のすべてのデータが完全に削除され、ログアウトされます。この操作は取り消せません。
+            </p>
+            <p className="text-xs text-slate-400 font-bold mb-2">
+              よろしければ「削除」と入力してください。
+            </p>
+            <input
+              type="text"
+              value={deleteAccountConfirmText}
+              onChange={(e) => setDeleteAccountConfirmText(e.target.value)}
+              disabled={isDeletingAccount}
+              className="w-full px-3 py-2 mb-4 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:border-red-300"
+              placeholder="削除"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowDeleteAccountConfirm(false);
+                  setDeleteAccountConfirmText("");
+                }}
+                disabled={isDeletingAccount}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-black active:scale-95 transition-transform disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteAccountConfirmText !== "削除" || isDeletingAccount}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-black active:scale-95 transition-transform disabled:opacity-40"
+              >
+                {isDeletingAccount ? "削除中..." : "削除する"}
               </button>
             </div>
           </div>
